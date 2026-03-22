@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm audit:*)",
+      "Bash(npx prisma:*)",
+      "Bash(cmd /c \"for /f \"\"tokens=5\"\" %a in \\(''netstat -ano ^| findstr :3001''\\) do taskkill /F /PID %a\")",
+      "Bash(curl -s http://localhost:3001/api/status)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(taskkill /F /IM tsx.exe)",
+      "Bash(git -C /c/Workspaces/0DTE-Copilot diff --stat HEAD)",
+      "Bash(git -C /c/Workspaces/0DTE-Copilot status)"
+    ]
+  }
+}

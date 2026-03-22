@@ -1,0 +1,40 @@
+// Learn more about Prisma schema: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model MarketSnapshot {
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime @default(now())
+  spxPrice  Float
+  spxVwap   Float
+  vix       Float
+  add       Float
+  tick      Float
+  aiAdvice  AiAdvice?
+}
+
+model AiAdvice {
+  id             Int            @id @default(autoincrement())
+  timestamp      DateTime       @default(now())
+  marketVibe     String
+  winProbability Float
+  action         String         // HOLD | TAKE_PROFIT | STOP_LOSS
+  reasoning      String
+  snapshotId     Int            @unique
+  snapshot       MarketSnapshot @relation(fields: [snapshotId], references: [id])
+}
+
+model TradeLog {
+  id          Int      @id @default(autoincrement())
+  timestamp   DateTime @default(now())
+  action      String
+  description String
+  pnl         Float?
+}
