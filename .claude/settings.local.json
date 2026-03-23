@@ -9,7 +9,15 @@
       "Bash(taskkill /F /IM node.exe)",
       "Bash(taskkill /F /IM tsx.exe)",
       "Bash(git -C /c/Workspaces/0DTE-Copilot diff --stat HEAD)",
-      "Bash(git -C /c/Workspaces/0DTE-Copilot status)"
+      "Bash(git -C /c/Workspaces/0DTE-Copilot status)",
+      "WebSearch",
+      "WebFetch(domain:finance.yahoo.com)",
+      "WebFetch(domain:jsr.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.mcoscillator.com)",
+      "WebFetch(domain:www.elitetrader.com)",
+      "Bash(npm run:*)",
+      "Bash(cmd /c \"taskkill /IM node.exe /F\")"
     ]
   }
 }

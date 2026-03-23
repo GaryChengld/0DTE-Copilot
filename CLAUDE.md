@@ -47,6 +47,7 @@ npx prisma studio        # inspect SQLite database
 | Task | Description | Date |
 |---|---|---|
 | [01-init-server](.claude/tasks/01-init-server.md) | Scaffold server app, Prisma, health check API | 2026-03-22 |
+| [02-market-ingestion-job](.claude/tasks/02-market-ingestion-job.md) | 5-min cron job: SPX/SPY/VIX/$ADD/$TICK snapshot with full-day VWAP | 2026-03-22 |
 
 ## Health Check
 

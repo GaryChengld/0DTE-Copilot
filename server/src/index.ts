@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { config } from "./config.js";
 import statusRouter from "./routes/status.js";
+import { startMarketIngestionJob } from "./jobs/marketIngestion.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -25,4 +26,5 @@ io.on("connection", (socket) => {
 
 httpServer.listen(config.port, () => {
   console.log(`Server running on http://localhost:${config.port}`);
+  startMarketIngestionJob();
 });

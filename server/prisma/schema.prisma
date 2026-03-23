@@ -12,11 +12,11 @@ datasource db {
 model MarketSnapshot {
   id        Int      @id @default(autoincrement())
   timestamp DateTime @default(now())
-  spxPrice  Float
+  spxClose  Float
   spxVwap   Float
+  spyClose  Float
+  spyVwap   Float
   vix       Float
-  add       Float
-  tick      Float
   aiAdvice  AiAdvice?
 }
 
