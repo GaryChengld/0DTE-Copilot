@@ -1,6 +1,7 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 import { calculateVwap } from "./vwap.js";
+
+const yahooFinance = new YahooFinance();
 
 type YFQuote = {
   date: Date;
@@ -51,7 +52,16 @@ function isRTHCandle(date: Date): boolean {
   return total >= 9 * 60 + 30 && total <= 16 * 60;
 }
 
-async function fetchTickerData(symbol: string): Promise<TickerData> {
+type RTHCandle = {
+  date: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
+async function fetchRTHCandles(symbol: string): Promise<RTHCandle[]> {
   const period1 = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const result = (await yahooFinance.chart(symbol, {
@@ -59,7 +69,7 @@ async function fetchTickerData(symbol: string): Promise<TickerData> {
     interval: "5m" as const,
   })) as unknown as YFChartResult;
 
-  const quotes = (result.quotes ?? []).filter(
+  return (result.quotes ?? []).filter(
     (q) =>
       q.date != null &&
       q.open != null &&
@@ -67,28 +77,17 @@ async function fetchTickerData(symbol: string): Promise<TickerData> {
       q.low != null &&
       q.close != null &&
       q.volume != null &&
+      q.volume > 0 &&
       isRTHCandle(q.date)
-  ) as Array<{
-    date: Date;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-  }>;
+  ) as RTHCandle[];
+}
 
-  if (quotes.length === 0) {
-    throw new Error(`No RTH quotes returned for ${symbol}`);
+function buildTickerData(candles: RTHCandle[], vwapCandles: RTHCandle[]): TickerData {
+  if (candles.length === 0) {
+    throw new Error("No RTH candles available");
   }
 
-  const latest = quotes[quotes.length - 1];
-
-  const dailyOpen = quotes[0].open;
-  const dailyHigh = Math.max(...quotes.map((q) => q.high));
-  const dailyLow = Math.min(...quotes.map((q) => q.low));
-  const dailyVolume = quotes.reduce((sum, q) => sum + q.volume, 0);
-
-  const vwap = calculateVwap(quotes);
+  const latest = candles[candles.length - 1];
 
   return {
     current: {
@@ -99,12 +98,12 @@ async function fetchTickerData(symbol: string): Promise<TickerData> {
       volume: latest.volume,
     },
     daily: {
-      open: dailyOpen,
-      high: dailyHigh,
-      low: dailyLow,
-      volume: dailyVolume,
+      open: candles[0].open,
+      high: Math.max(...candles.map((q) => q.high)),
+      low: Math.min(...candles.map((q) => q.low)),
+      volume: candles.reduce((sum, q) => sum + q.volume, 0),
     },
-    vwap,
+    vwap: calculateVwap(vwapCandles),
   };
 }
 
@@ -116,11 +115,25 @@ async function fetchVix(): Promise<number> {
 }
 
 export async function fetchMarketData(): Promise<MarketData> {
-  const [spx, spy, vix] = await Promise.all([
-    fetchTickerData("^GSPC"),
-    fetchTickerData("SPY"),
+  const [spxCandles, spyCandles, vix] = await Promise.all([
+    fetchRTHCandles("^GSPC"),
+    fetchRTHCandles("SPY"),
     fetchVix(),
   ]);
+
+  if (spxCandles.length === 0) throw new Error("No RTH quotes returned for ^GSPC");
+  if (spyCandles.length === 0) throw new Error("No RTH quotes returned for SPY");
+
+  // SPX VWAP: use SPX prices (H/L/C) with SPY volume — SPX is a cash index with unreliable synthetic volume
+  const spxWithSpyVolume = spxCandles.map((spxCandle) => {
+    const spyCandle = spyCandles.find(
+      (s) => s.date.getTime() === spxCandle.date.getTime()
+    );
+    return { ...spxCandle, volume: spyCandle?.volume ?? 0 };
+  });
+
+  const spx = buildTickerData(spxCandles, spxWithSpyVolume);
+  const spy = buildTickerData(spyCandles, spyCandles);
 
   return { spx, spy, vix };
 }

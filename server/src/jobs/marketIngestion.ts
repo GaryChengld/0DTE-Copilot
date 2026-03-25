@@ -1,27 +1,13 @@
 import cron from "node-cron";
+import type { Server } from "socket.io";
 import { buildSnapshot } from "../services/snapshotBuilder.js";
+import { sendToAI } from "../services/aiSession.js";
 import prisma from "../db/client.js";
+import { config } from "../config.js";
+import { setJobSuccess, setJobError } from "./jobState.js";
+import { isMarketHours } from "../utils/marketHours.js";
 
-function isMarketHours(): boolean {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    minute: "numeric",
-    weekday: "short",
-    hour12: false,
-  }).formatToParts(new Date());
-
-  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
-  if (["Sat", "Sun"].includes(weekday)) return false;
-
-  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0");
-  const minute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0");
-  const total = hour * 60 + minute;
-
-  return total >= 9 * 60 + 30 && total < 16 * 60;
-}
-
-async function runIngestion(): Promise<void> {
+async function runIngestion(io: Server): Promise<void> {
   if (!isMarketHours()) return;
 
   try {
@@ -30,19 +16,35 @@ async function runIngestion(): Promise<void> {
 
     await prisma.marketSnapshot.create({
       data: {
-        spxClose: snapshot.market_data.spx.current.close,
-        spxVwap: snapshot.market_data.spx.vwap ?? 0,
-        spyClose: snapshot.market_data.spy.current.close,
-        spyVwap: snapshot.market_data.spy.vwap ?? 0,
-        vix: snapshot.market_data.vix,
+        id: Date.now(),
+        ticker: "SPX",
+        timestamp: new Date(snapshot.timestamp),
+        marketData: snapshot.market_data,
       },
     });
+
+    const response = await sendToAI(JSON.stringify(snapshot.market_data));
+
+    await prisma.aiAdvice.create({
+      data: {
+        source: "job",
+        prompt: null,
+        response,
+        provider: config.llm.provider,
+      },
+    });
+
+    io.emit("chat:response", { source: "job", response });
+
+    setJobSuccess(snapshot.timestamp);
   } catch (err) {
-    console.error("[marketIngestion] error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[marketIngestion] error:", message);
+    setJobError(new Date().toISOString(), message);
   }
 }
 
-export function startMarketIngestionJob(): void {
-  console.log("[marketIngestion] job scheduled (*/5 * * * *, RTH only)");
-  cron.schedule("*/5 * * * *", runIngestion);
+export function startMarketIngestionJob(io: Server): void {
+  console.log("[marketIngestion] job scheduled (15s past every 5min, RTH only)");
+  cron.schedule("15 */5 * * * *", () => runIngestion(io));
 }

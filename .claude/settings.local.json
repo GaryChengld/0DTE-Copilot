@@ -17,7 +17,12 @@
       "WebFetch(domain:www.mcoscillator.com)",
       "WebFetch(domain:www.elitetrader.com)",
       "Bash(npm run:*)",
-      "Bash(cmd /c \"taskkill /IM node.exe /F\")"
+      "Bash(cmd /c \"taskkill /IM node.exe /F\")",
+      "WebFetch(domain:marketstack.com)",
+      "WebFetch(domain:api.marketstack.com)",
+      "WebFetch(domain:community.marketstack.com)",
+      "WebFetch(domain:www.findmymoat.com)",
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes\" npx prisma migrate reset --force)"
     ]
   }
 }

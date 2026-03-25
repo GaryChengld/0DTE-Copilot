@@ -10,25 +10,19 @@ datasource db {
 }
 
 model MarketSnapshot {
-  id        Int      @id @default(autoincrement())
-  timestamp DateTime @default(now())
-  spxClose  Float
-  spxVwap   Float
-  spyClose  Float
-  spyVwap   Float
-  vix       Float
-  aiAdvice  AiAdvice?
+  id         Int      @id
+  ticker     String
+  timestamp  DateTime
+  marketData Json
 }
 
 model AiAdvice {
-  id             Int            @id @default(autoincrement())
-  timestamp      DateTime       @default(now())
-  marketVibe     String
-  winProbability Float
-  action         String         // HOLD | TAKE_PROFIT | STOP_LOSS
-  reasoning      String
-  snapshotId     Int            @unique
-  snapshot       MarketSnapshot @relation(fields: [snapshotId], references: [id])
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime @default(now())
+  source    String   // "job" | "user"
+  prompt    String?  // user message; null for job-triggered entries
+  response  String   // AI response in markdown
+  provider  String   // "gemini" | "openai" | "claude"
 }
 
 model TradeLog {

@@ -48,6 +48,9 @@ npx prisma studio        # inspect SQLite database
 |---|---|---|
 | [01-init-server](.claude/tasks/01-init-server.md) | Scaffold server app, Prisma, health check API | 2026-03-22 |
 | [02-market-ingestion-job](.claude/tasks/02-market-ingestion-job.md) | 5-min cron job: SPX/SPY/VIX/$ADD/$TICK snapshot with full-day VWAP | 2026-03-22 |
+| [03-job-health-check](.claude/tasks/03-job-health-check.md) | Expose market ingestion job status in GET /api/status | 2026-03-23 |
+| [04-ai-chat-session](.claude/tasks/04-ai-chat-session.md) | Persistent Gemini chat session fed by cron job + frontend Socket.io messages | 2026-03-24 |
+| [05-ai-session-health-check](.claude/tasks/05-ai-session-health-check.md) | Expose AI session status in GET /api/status | 2026-03-24 |
 
 ## Health Check
 
