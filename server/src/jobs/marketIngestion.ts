@@ -1,8 +1,9 @@
 import cron from "node-cron";
 import type { Server } from "socket.io";
 import { buildSnapshot } from "../services/snapshotBuilder.js";
-import { sendToAI } from "../services/aiSession.js";
-import prisma from "../db/client.js";
+import { sendToAI, isSessionAvailable } from "../services/aiSession.js";
+import { createMarketSnapshot, createAiAdvice } from "../db/ingestionRepository.js";
+import { findOpenTrades } from "../db/tradeRepository.js";
 import { config } from "../config.js";
 import { setJobSuccess, setJobError } from "./jobState.js";
 import { isMarketHours } from "../utils/marketHours.js";
@@ -14,27 +15,24 @@ async function runIngestion(io: Server): Promise<void> {
     const snapshot = await buildSnapshot();
     console.log(JSON.stringify(snapshot, null, 2));
 
-    await prisma.marketSnapshot.create({
-      data: {
-        id: Date.now(),
-        ticker: "SPX",
-        timestamp: new Date(snapshot.timestamp),
-        marketData: snapshot.market_data,
-      },
+    await createMarketSnapshot({
+      id: Date.now(),
+      ticker: "SPX",
+      timestamp: new Date(snapshot.timestamp),
+      marketData: snapshot.market_data,
     });
 
-    const response = await sendToAI(JSON.stringify(snapshot.market_data));
+    if (isSessionAvailable()) {
+      const openTrades = await findOpenTrades();
+      const payload = JSON.stringify({ market_data: snapshot.market_data, open_positions: openTrades });
+      const response = await sendToAI(payload);
 
-    await prisma.aiAdvice.create({
-      data: {
-        source: "job",
-        prompt: null,
-        response,
-        provider: config.llm.provider,
-      },
-    });
+      await createAiAdvice({ source: "job", prompt: null, response, provider: config.llm.provider });
 
-    io.emit("chat:response", { source: "job", response });
+      io.emit("chat:response", { source: "job", response });
+    } else {
+      console.warn("[marketIngestion] skipping AI call — session is in error state");
+    }
 
     setJobSuccess(snapshot.timestamp);
   } catch (err) {

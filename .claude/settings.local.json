@@ -22,7 +22,10 @@
       "WebFetch(domain:api.marketstack.com)",
       "WebFetch(domain:community.marketstack.com)",
       "WebFetch(domain:www.findmymoat.com)",
-      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes\" npx prisma migrate reset --force)"
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes\" npx prisma migrate reset --force)",
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=I_AM_SURE npx prisma migrate dev --name add_trade_tables 2>&1)",
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=I_AM_SURE npx prisma migrate dev --name remove_trade_no 2>&1)",
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=I_AM_SURE npx prisma migrate dev --name replace_strikes_with_strike)"
     ]
   }
 }

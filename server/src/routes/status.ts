@@ -10,7 +10,7 @@ router.get("/status", async (_req: Request, res: Response) => {
 
   let dbStatus = "ok";
   try {
-    await prisma.tradeLog.count();
+    await prisma.trade.count();
   } catch {
     dbStatus = "error";
   }

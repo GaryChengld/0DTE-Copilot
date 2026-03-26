@@ -4,7 +4,8 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createLLMProvider } from "./llm/index.js";
 import type { LLMProvider } from "./llm/index.js";
-import prisma from "../db/client.js";
+import { getTodayMarketSnapshots } from "../db/ingestionRepository.js";
+import { findOpenTrades } from "../db/tradeRepository.js";
 import { isMarketHours } from "../utils/marketHours.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,25 +32,23 @@ export function getAISessionState(): AISessionState {
   return { ...sessionState };
 }
 
+export function isSessionAvailable(): boolean {
+  return sessionState.status === "ok";
+}
+
 let provider: LLMProvider | null = null;
 let isReplaying = false;
 
-function getTodayStart(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 async function replayTodayHistory(): Promise<void> {
-  const snapshots = await prisma.marketSnapshot.findMany({
-    where: { timestamp: { gte: getTodayStart() } },
-    orderBy: { timestamp: "asc" },
-  });
+  const [snapshots, openPositions] = await Promise.all([
+    getTodayMarketSnapshots(),
+    findOpenTrades(),
+  ]);
 
   if (snapshots.length === 0) return;
 
   const body = snapshots
-    .map((snap) => JSON.stringify(snap.marketData))
+    .map((snap) => JSON.stringify({ market_data: snap.marketData, open_positions: openPositions }))
     .join("\n---\n");
 
   const message =

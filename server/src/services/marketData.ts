@@ -63,23 +63,27 @@ type RTHCandle = {
 
 async function fetchRTHCandles(symbol: string): Promise<RTHCandle[]> {
   const period1 = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const todayET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
 
   const result = (await yahooFinance.chart(symbol, {
     period1,
     interval: "5m" as const,
   })) as unknown as YFChartResult;
 
-  return (result.quotes ?? []).filter(
-    (q) =>
-      q.date != null &&
-      q.open != null &&
-      q.high != null &&
-      q.low != null &&
-      q.close != null &&
-      q.volume != null &&
-      q.volume > 0 &&
-      isRTHCandle(q.date)
-  ) as RTHCandle[];
+  return (result.quotes ?? []).filter((q) => {
+    if (
+      q.date == null ||
+      q.open == null ||
+      q.high == null ||
+      q.low == null ||
+      q.close == null ||
+      q.volume == null ||
+      q.volume <= 0
+    )
+      return false;
+    const candleDateET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(q.date);
+    return candleDateET === todayET && isRTHCandle(q.date);
+  }) as RTHCandle[];
 }
 
 function buildTickerData(candles: RTHCandle[], vwapCandles: RTHCandle[]): TickerData {
@@ -108,10 +112,14 @@ function buildTickerData(candles: RTHCandle[], vwapCandles: RTHCandle[]): Ticker
 }
 
 async function fetchVix(): Promise<number> {
-  const result = (await yahooFinance.quote("^VIX")) as unknown as {
-    regularMarketPrice?: number;
-  };
-  return result.regularMarketPrice ?? 0;
+  const period1 = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const result = (await yahooFinance.chart("^VIX", {
+    period1,
+    interval: "5m" as const,
+  })) as unknown as YFChartResult;
+
+  return result.meta?.regularMarketPrice ?? 0;
 }
 
 export async function fetchMarketData(): Promise<MarketData> {

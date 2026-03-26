@@ -25,10 +25,34 @@ model AiAdvice {
   provider  String   // "gemini" | "openai" | "claude"
 }
 
-model TradeLog {
-  id          Int      @id @default(autoincrement())
-  timestamp   DateTime @default(now())
-  action      String
-  description String
-  pnl         Float?
+model Trade {
+  id                Int         @id @default(autoincrement())
+  tradeDate         String      // YYYY-MM-DD
+  status            String      @default("OPEN") // OPEN | PARTIAL_CLOSED | CLOSED
+  symbol            String      // e.g., SPX
+  tradeType         String      @default("SPREAD") // SINGLE | SPREAD
+  spreadType        String      @default("CREDIT") // CREDIT | DEBIT
+  optionType        String?     // PUT | CALL
+  strike            String?     // e.g., "5510/5500" for SPREAD, "5505" for SINGLE
+  quantityInitial   Int
+  quantityRemaining Int
+  entryPrice        Float?
+  entryTime         String?     // ISO8601 string (ET)
+  exits             TradeExit[]
+
+}
+
+model TradeExit {
+  id           Int    @id @default(autoincrement())
+  tradeId      Int
+  trade        Trade  @relation(fields: [tradeId], references: [id])
+  tradeDate    String // YYYY-MM-DD — denormalized for fast daily PnL aggregation
+  exitQuantity Int
+  exitPrice    Float  // settlement value of spread; 0.00 when expires worthless
+  exitTime     String // ISO8601 string (ET)
+  exitReason   String // Take Profit | Stop Loss | Expired
+  pnl          Float? // (entryPrice - exitPrice) × qty × 100 for CREDIT; reversed for DEBIT
+
+  @@index([tradeDate])
+  @@index([tradeId])
 }

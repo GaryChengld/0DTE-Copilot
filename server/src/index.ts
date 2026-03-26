@@ -3,9 +3,11 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { config } from "./config.js";
 import statusRouter from "./routes/status.js";
+import tradesRouter from "./routes/trades.js";
+import chatRouter from "./routes/chat.js";
 import { startMarketIngestionJob } from "./jobs/marketIngestion.js";
 import { initAISession, scheduleDailyReset, sendToAI } from "./services/aiSession.js";
-import prisma from "./db/client.js";
+import { createAiAdvice } from "./db/ingestionRepository.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -17,6 +19,8 @@ app.use(express.json());
 
 // Routes
 app.use("/api", statusRouter);
+app.use("/api", tradesRouter);
+app.use("/api", chatRouter);
 
 // Socket.io
 io.on("connection", (socket) => {
@@ -25,9 +29,7 @@ io.on("connection", (socket) => {
   socket.on("chat:message", async (message: string) => {
     try {
       const response = await sendToAI(message);
-      await prisma.aiAdvice.create({
-        data: { source: "user", prompt: message, response, provider: config.llm.provider },
-      });
+      await createAiAdvice({ source: "user", prompt: message, response, provider: config.llm.provider });
       io.emit("chat:response", { source: "user", response });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -43,7 +45,11 @@ io.on("connection", (socket) => {
 
 httpServer.listen(config.port, async () => {
   console.log(`Server running on http://localhost:${config.port}`);
-  await initAISession();
+  try {
+    await initAISession();
+  } catch (err) {
+    console.error("[startup] AI session init failed, continuing without AI:", err);
+  }
   scheduleDailyReset();
   startMarketIngestionJob(io);
 });
