@@ -69,6 +69,9 @@ async function createSession(withHistory: boolean): Promise<void> {
   sessionState.provider = process.env.LLM_PROVIDER ?? "gemini";
   sessionState.status = "uninitialized";
   const initResponse = await provider.init(loadPrompt());
+  sessionState.status = "ok";
+  sessionState.lastMessageAt = new Date().toISOString();
+  sessionState.lastError = null;
   if (initResponse) console.log("[AI response]\n", initResponse);
   if (withHistory && isMarketHours()) await replayTodayHistory();
 }
