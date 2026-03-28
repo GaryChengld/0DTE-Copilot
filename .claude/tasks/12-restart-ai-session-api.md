@@ -1,4 +1,4 @@
-# Task 12 — Restart AI Session API
+# Task 12 — Restart AI Session API ✅ COMPLETED
 
 ## Goal
 

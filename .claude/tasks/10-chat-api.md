@@ -1,4 +1,4 @@
-# Task 10 — Chat API
+# Task 10 — Chat API ✅ COMPLETED
 
 ## Goal
 

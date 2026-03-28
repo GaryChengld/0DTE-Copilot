@@ -1,4 +1,4 @@
-# Task 14 — On-Demand AI Analysis API
+# Task 14 — On-Demand AI Analysis API ✅ COMPLETED
 
 ## Goal
 
@@ -92,8 +92,19 @@ Error handling: return HTTP 500 with `{ error: message }` on failure.
 ### Modify: `server/src/index.ts`
 
 - Remove `startMarketIngestionJob()` import and call
+- Remove `initAISession()` call and import — session is now lazy-initialized on first use
+- Remove `scheduleDailyReset()` call and import
 - Mount new analysis router: `app.use("/api", analysisRouter)`
 - Pass `io` to the analysis route handler (same pattern as existing routes)
+
+### Modify: `server/src/services/aiSession.ts`
+
+- Remove `isSessionAvailable()` export — no longer needed
+- Remove `scheduleDailyReset()` export — no longer needed
+- In `sendToAI()`: if `provider` is `null` (uninitialized), call `initAISession()` before sending
+- Add `restart: boolean` parameter to `sendToAI(message, restart)` — if `true`, call `restartAISession()` before sending
+- Pass `restart: true` in `POST /api/ai/analyze` (analysis route) — always restart session before analysis
+- Pass `restart: false` everywhere else (`POST /api/chat`, Socket.io `chat:message` handler)
 
 ### Modify: `server/src/routes/status.ts`
 
@@ -103,6 +114,12 @@ Remove job status fields from the `GET /api/status` response.
 
 If snapshot builder is only used by the job, delete it. Otherwise adapt it to work with
 `fetchMarketData()` output for the AI message format.
+
+### Modify: `server/src/routes/trades.ts`
+
+Remove `notifyAIWithOpenPositions()` — the function definition and all 3 call sites (open trade,
+exit trade, delete trade). AI is no longer notified on trade events; analysis is triggered
+on-demand via `POST /api/ai/analyze` instead.
 
 ## Done When
 

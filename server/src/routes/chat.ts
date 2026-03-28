@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { sendToAI, isSessionAvailable, restartAISession, getAISessionState } from "../services/aiSession.js";
+import { sendToAI, restartAISession, getAISessionState } from "../services/aiSession.js";
 import { createAiAdvice, getLatestAiAdvices } from "../db/ingestionRepository.js";
 import { config } from "../config.js";
 
@@ -10,11 +10,6 @@ router.post("/chat", async (req: Request, res: Response) => {
 
   if (!message || !message.trim()) {
     res.status(400).json({ error: "Missing required field: message" });
-    return;
-  }
-
-  if (!isSessionAvailable()) {
-    res.status(503).json({ error: "AI session is not available" });
     return;
   }
 

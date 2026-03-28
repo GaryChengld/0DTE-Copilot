@@ -1,4 +1,3 @@
-import cron from "node-cron";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -35,10 +34,6 @@ export function getAISessionState(): AISessionState {
   return { ...sessionState };
 }
 
-export function isSessionAvailable(): boolean {
-  return sessionState.status === "ok";
-}
-
 let provider: LLMProvider | null = null;
 let messageCount = 0;
 
@@ -66,8 +61,14 @@ export async function initAISession(): Promise<void> {
   console.log(`[aiSession] initialized with provider: ${process.env.LLM_PROVIDER ?? "gemini"}`);
 }
 
-export async function sendToAI(message: string): Promise<string> {
-  if (!provider) throw new Error("AI session not initialized");
+export async function sendToAI(message: string, restart: boolean = false): Promise<string> {
+  if (restart) {
+    console.log("[aiSession] restart requested, restarting session before send...");
+    await restartAISession();
+  } else if (!provider) {
+    console.log("[aiSession] session uninitialized, auto-initializing...");
+    await initAISession();
+  }
 
   const send = () => provider!.send(message);
   const log = (response: string) => {
@@ -127,14 +128,3 @@ export async function restartAISession(): Promise<void> {
   await createSession();
 }
 
-export function scheduleDailyReset(): void {
-  cron.schedule(
-    "0 8 * * 1-5",
-    async () => {
-      console.log("[aiSession] daily reset at 8:00 AM ET");
-      await createSession();
-    },
-    { timezone: "America/New_York" }
-  );
-  console.log("[aiSession] daily reset scheduled at 8:00 AM ET (Mon–Fri)");
-}

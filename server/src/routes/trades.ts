@@ -7,19 +7,7 @@ import {
   updateTradeAfterExit,
   deleteTrade,
 } from "../db/tradeRepository.js";
-import { sendToAI, isSessionAvailable } from "../services/aiSession.js";
-
 const router = Router();
-
-async function notifyAIWithOpenPositions(): Promise<void> {
-  if (!isSessionAvailable()) return;
-  try {
-    const openPositions = await findOpenTrades();
-    await sendToAI(JSON.stringify({ open_positions: openPositions }));
-  } catch (err) {
-    console.error("[trades] failed to notify AI with open positions:", err instanceof Error ? err.message : err);
-  }
-}
 
 function getMarketDate(isoString?: string): string {
   const date = isoString ? new Date(isoString) : new Date();
@@ -75,8 +63,6 @@ router.post("/trades", async (req: Request, res: Response) => {
     entryTime: entryTime ?? new Date().toISOString(),
   });
 
-  await notifyAIWithOpenPositions();
-
   res.status(201).json({
     id: trade.id,
     tradeDate: trade.tradeDate,
@@ -130,7 +116,6 @@ router.post("/trades/exits", async (req: Request, res: Response) => {
   });
 
   await updateTradeAfterExit(tradeId, trade.quantityRemaining - exitQuantity);
-  await notifyAIWithOpenPositions();
 
   res.status(201).json({
     id: exit.id,
@@ -155,7 +140,6 @@ router.delete("/trades/:id", async (req: Request, res: Response) => {
   }
 
   const count = await deleteTrade(id);
-  await notifyAIWithOpenPositions();
 
   res.json({ message: `Trade ${id} and ${count} exit(s) deleted` });
 });

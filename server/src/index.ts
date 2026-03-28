@@ -5,8 +5,8 @@ import { config } from "./config.js";
 import statusRouter from "./routes/status.js";
 import tradesRouter from "./routes/trades.js";
 import chatRouter from "./routes/chat.js";
-import { startMarketIngestionJob } from "./jobs/marketIngestion.js";
-import { initAISession, scheduleDailyReset, sendToAI } from "./services/aiSession.js";
+import { createAnalysisRouter } from "./routes/analysis.js";
+import { sendToAI } from "./services/aiSession.js";
 import { createAiAdvice } from "./db/ingestionRepository.js";
 
 const app = express();
@@ -21,6 +21,7 @@ app.use(express.json());
 app.use("/api", statusRouter);
 app.use("/api", tradesRouter);
 app.use("/api", chatRouter);
+app.use("/api", createAnalysisRouter(io));
 
 // Socket.io
 io.on("connection", (socket) => {
@@ -43,13 +44,6 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(config.port, async () => {
+httpServer.listen(config.port, () => {
   console.log(`Server running on http://localhost:${config.port}`);
-  try {
-    await initAISession();
-  } catch (err) {
-    console.error("[startup] AI session init failed, continuing without AI:", err);
-  }
-  scheduleDailyReset();
-  startMarketIngestionJob(io);
 });

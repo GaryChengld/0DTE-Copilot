@@ -9,13 +9,6 @@ datasource db {
   provider = "sqlite"
 }
 
-model MarketSnapshot {
-  id         Int      @id
-  ticker     String
-  timestamp  DateTime
-  marketData Json
-}
-
 model AiAdvice {
   id        Int      @id @default(autoincrement())
   timestamp DateTime @default(now())

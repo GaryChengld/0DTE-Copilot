@@ -1,4 +1,4 @@
-# Task 11 — Get Latest AI Advices API
+# Task 11 — Get Latest AI Advices API ✅ COMPLETED
 
 ## Goal
 
