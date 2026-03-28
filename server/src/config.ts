@@ -3,6 +3,8 @@ import "dotenv/config";
 export const config = {
   port: parseInt(process.env.PORT ?? "3001", 10),
   databaseUrl: process.env.DATABASE_URL ?? "file:./dev.db",
+  promptFile: process.env.PROMPT_FILE ?? "strategicPrompt.md",
+  sessionSummaryInterval: parseInt(process.env.SESSION_SUMMARY_INTERVAL ?? "20", 10),
   llm: {
     provider: process.env.LLM_PROVIDER ?? "gemini",
     gemini: {

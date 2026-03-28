@@ -3,15 +3,18 @@ import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createLLMProvider } from "./llm/index.js";
+import { config } from "../config.js";
 import type { LLMProvider } from "./llm/index.js";
-import { getTodayMarketSnapshots } from "../db/ingestionRepository.js";
-import { findOpenTrades } from "../db/tradeRepository.js";
-import { isMarketHours } from "../utils/marketHours.js";
+import { getTodaySessionSummary, createAiAdvice } from "../db/ingestionRepository.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function loadPrompt(): string {
-  return readFileSync(join(__dirname, "../prompts/strategicPrompt.md"), "utf-8");
+  return readFileSync(join(__dirname, "../prompts", config.promptFile), "utf-8");
+}
+
+function loadSummaryPrompt(): string {
+  return readFileSync(join(__dirname, "../prompts/summaryPrompt.md"), "utf-8");
 }
 
 interface AISessionState {
@@ -37,47 +40,29 @@ export function isSessionAvailable(): boolean {
 }
 
 let provider: LLMProvider | null = null;
-let isReplaying = false;
+let messageCount = 0;
 
-async function replayTodayHistory(): Promise<void> {
-  const [snapshots, openPositions] = await Promise.all([
-    getTodayMarketSnapshots(),
-    findOpenTrades(),
-  ]);
-
-  if (snapshots.length === 0) return;
-
-  const body = snapshots
-    .map((snap) => JSON.stringify({ market_data: snap.marketData, open_positions: openPositions }))
-    .join("\n---\n");
-
-  const message =
-    `[HISTORY REPLAY] The following are today's market snapshots in chronological order. Use them as context only.\n\n${body}`;
-
-  isReplaying = true;
-  try {
-    await sendToAI(message);
-  } finally {
-    isReplaying = false;
-  }
-
-  console.log(`[aiSession] replayed ${snapshots.length} snapshot(s) as history`);
-}
-
-async function createSession(withHistory: boolean): Promise<void> {
+async function createSession(): Promise<void> {
   provider = createLLMProvider();
   sessionState.provider = process.env.LLM_PROVIDER ?? "gemini";
   sessionState.status = "uninitialized";
+  messageCount = 0;
+
   const initResponse = await provider.init(loadPrompt());
   sessionState.status = "ok";
   sessionState.lastMessageAt = new Date().toISOString();
   sessionState.lastError = null;
   if (initResponse) console.log("[AI response]\n", initResponse);
-  if (withHistory && isMarketHours()) await replayTodayHistory();
+
+  const summary = await getTodaySessionSummary();
+  if (summary) {
+    console.log("[aiSession] injecting today's session summary as context");
+    await sendToAI(`[SESSION CONTEXT] ${summary}`);
+  }
 }
 
 export async function initAISession(): Promise<void> {
-  await createSession(true);
+  await createSession();
   console.log(`[aiSession] initialized with provider: ${process.env.LLM_PROVIDER ?? "gemini"}`);
 }
 
@@ -86,49 +71,60 @@ export async function sendToAI(message: string): Promise<string> {
 
   const send = () => provider!.send(message);
   const log = (response: string) => {
-    if (!isReplaying) console.log("[AI response]\n", response);
+    console.log("[AI response]\n", response);
   };
 
   const succeed = (response: string) => {
-    if (!isReplaying) {
-      sessionState.status = "ok";
-      sessionState.lastMessageAt = new Date().toISOString();
-      sessionState.lastError = null;
-    }
+    sessionState.status = "ok";
+    sessionState.lastMessageAt = new Date().toISOString();
+    sessionState.lastError = null;
     log(response);
     return response;
   };
 
   const fail = (err: unknown) => {
-    if (!isReplaying) {
-      sessionState.status = "error";
-      sessionState.lastMessageAt = new Date().toISOString();
-      sessionState.lastError = err instanceof Error ? err.message : String(err);
-    }
+    sessionState.status = "error";
+    sessionState.lastMessageAt = new Date().toISOString();
+    sessionState.lastError = err instanceof Error ? err.message : String(err);
   };
 
+  let response: string;
   try {
-    return succeed(await send());
+    response = succeed(await send());
   } catch {
     try {
-      return succeed(await send());
+      response = succeed(await send());
     } catch (retryErr) {
-      if (isReplaying) throw retryErr;
       console.error("[aiSession] retry failed, restarting session:", retryErr);
       await restartAISession();
       try {
-        return succeed(await send());
+        response = succeed(await send());
       } catch (finalErr) {
         fail(finalErr);
         throw finalErr;
       }
     }
   }
+
+  messageCount++;
+  if (messageCount >= config.sessionSummaryInterval) {
+    console.log(`[aiSession] message count reached ${messageCount}, triggering auto-restart`);
+    await restartAISession();
+  }
+
+  return response!;
 }
 
 export async function restartAISession(): Promise<void> {
-  console.log("[aiSession] restarting session and replaying history...");
-  await createSession(true);
+  console.log("[aiSession] generating session summary...");
+  try {
+    const summary = await provider!.send(loadSummaryPrompt());
+    await createAiAdvice({ source: "session_summary", prompt: null, response: summary, provider: config.llm.provider });
+    console.log("[aiSession] session summary stored, restarting...");
+  } catch (err) {
+    console.warn("[aiSession] failed to generate session summary, restarting without context:", err instanceof Error ? err.message : err);
+  }
+  await createSession();
 }
 
 export function scheduleDailyReset(): void {
@@ -136,7 +132,7 @@ export function scheduleDailyReset(): void {
     "0 8 * * 1-5",
     async () => {
       console.log("[aiSession] daily reset at 8:00 AM ET");
-      await createSession(false);
+      await createSession();
     },
     { timezone: "America/New_York" }
   );

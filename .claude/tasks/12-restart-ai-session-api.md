@@ -45,3 +45,7 @@ Returns `500` if restart throws an exception:
 - `POST /api/ai-session/restart` restarts the AI session and returns `200` with updated session state
 - `500` returned if restart fails
 - TypeScript compiles without errors (`npm run build`)
+
+## Status
+
+✅ COMPLETED — 2026-03-26

@@ -12,9 +12,17 @@ type YFQuote = {
   volume: number | null;
 };
 
+type YFMeta = {
+  regularMarketPrice?: number;
+  regularMarketOpen?: number;
+  regularMarketDayHigh?: number;
+  regularMarketDayLow?: number;
+  regularMarketVolume?: number;
+};
+
 type YFChartResult = {
   quotes: YFQuote[];
-  meta: { regularMarketPrice?: number };
+  meta: YFMeta;
 };
 
 export interface OHLCBar {
@@ -61,7 +69,9 @@ type RTHCandle = {
   volume: number;
 };
 
-async function fetchRTHCandles(symbol: string): Promise<RTHCandle[]> {
+type ChartResult = { candles: RTHCandle[]; meta: YFMeta };
+
+async function fetchChartResult(symbol: string): Promise<ChartResult> {
   const period1 = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const todayET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
 
@@ -70,7 +80,7 @@ async function fetchRTHCandles(symbol: string): Promise<RTHCandle[]> {
     interval: "5m" as const,
   })) as unknown as YFChartResult;
 
-  return (result.quotes ?? []).filter((q) => {
+  const candles = (result.quotes ?? []).filter((q) => {
     if (
       q.date == null ||
       q.open == null ||
@@ -84,6 +94,22 @@ async function fetchRTHCandles(symbol: string): Promise<RTHCandle[]> {
     const candleDateET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(q.date);
     return candleDateET === todayET && isRTHCandle(q.date);
   }) as RTHCandle[];
+
+  return { candles, meta: result.meta };
+}
+
+function buildTickerDataFromMeta(meta: YFMeta): TickerData {
+  const price = meta.regularMarketPrice ?? 0;
+  const open = meta.regularMarketOpen ?? price;
+  const high = meta.regularMarketDayHigh ?? price;
+  const low = meta.regularMarketDayLow ?? price;
+  const volume = meta.regularMarketVolume ?? 0;
+
+  return {
+    current: { open, high, low, close: price, volume },
+    daily: { open, high, low, volume },
+    vwap: null,
+  };
 }
 
 function buildTickerData(candles: RTHCandle[], vwapCandles: RTHCandle[]): TickerData {
@@ -123,25 +149,32 @@ async function fetchVix(): Promise<number> {
 }
 
 export async function fetchMarketData(): Promise<MarketData> {
-  const [spxCandles, spyCandles, vix] = await Promise.all([
-    fetchRTHCandles("^GSPC"),
-    fetchRTHCandles("SPY"),
+  const [spxResult, spyResult, vix] = await Promise.all([
+    fetchChartResult("^GSPC"),
+    fetchChartResult("SPY"),
     fetchVix(),
   ]);
 
-  if (spxCandles.length === 0) throw new Error("No RTH quotes returned for ^GSPC");
-  if (spyCandles.length === 0) throw new Error("No RTH quotes returned for SPY");
+  let spx: TickerData;
+  let spy: TickerData;
 
-  // SPX VWAP: use SPX prices (H/L/C) with SPY volume — SPX is a cash index with unreliable synthetic volume
-  const spxWithSpyVolume = spxCandles.map((spxCandle) => {
-    const spyCandle = spyCandles.find(
-      (s) => s.date.getTime() === spxCandle.date.getTime()
-    );
-    return { ...spxCandle, volume: spyCandle?.volume ?? 0 };
-  });
+  if (spxResult.candles.length === 0 || spyResult.candles.length === 0) {
+    // Market just opened — no completed 5-min candles yet. Use daily meta data only.
+    console.log("[marketData] no RTH candles yet — using daily meta data for opening snapshot");
+    spx = buildTickerDataFromMeta(spxResult.meta);
+    spy = buildTickerDataFromMeta(spyResult.meta);
+  } else {
+    // SPX VWAP: use SPX prices (H/L/C) with SPY volume — SPX is a cash index with unreliable synthetic volume
+    const spxWithSpyVolume = spxResult.candles.map((spxCandle) => {
+      const spyCandle = spyResult.candles.find(
+        (s) => s.date.getTime() === spxCandle.date.getTime()
+      );
+      return { ...spxCandle, volume: spyCandle?.volume ?? 0 };
+    });
 
-  const spx = buildTickerData(spxCandles, spxWithSpyVolume);
-  const spy = buildTickerData(spyCandles, spyCandles);
+    spx = buildTickerData(spxResult.candles, spxWithSpyVolume);
+    spy = buildTickerData(spyResult.candles, spyResult.candles);
+  }
 
   return { spx, spy, vix };
 }

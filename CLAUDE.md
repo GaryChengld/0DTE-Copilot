@@ -28,7 +28,7 @@ server/    # Express backend — data ingestion, VWAP, Gemini AI, Socket.io
     db/client.ts      # Prisma singleton (uses @prisma/adapter-better-sqlite3)
     generated/prisma/ # Auto-generated Prisma client (do not edit)
   prisma/
-    schema.prisma     # DB schema: MarketSnapshot, AiAdvice, TradeLog
+    schema.prisma     # DB schema: MarketSnapshot, AiAdvice, Trade, TradeExit
 ```
 
 ## Commands
@@ -51,6 +51,15 @@ npx prisma studio        # inspect SQLite database
 | [03-job-health-check](.claude/tasks/03-job-health-check.md) | Expose market ingestion job status in GET /api/status | 2026-03-23 |
 | [04-ai-chat-session](.claude/tasks/04-ai-chat-session.md) | Persistent Gemini chat session fed by cron job + frontend Socket.io messages | 2026-03-24 |
 | [05-ai-session-health-check](.claude/tasks/05-ai-session-health-check.md) | Expose AI session status in GET /api/status | 2026-03-24 |
+| [06-open-position-api](.claude/tasks/06-open-position-api.md) | POST /api/trades — open a new trade position | 2026-03-26 |
+| [07-exit-position-api](.claude/tasks/07-exit-position-api.md) | POST /api/trades/exits — exit (partial or full) a trade position | 2026-03-26 |
+| [08-get-open-trades-api](.claude/tasks/08-get-open-trades-api.md) | GET /api/trades/open — retrieve all open trades | 2026-03-26 |
+| [09-delete-trade-api](.claude/tasks/09-delete-trade-api.md) | DELETE /api/trades/:id — delete a trade and its exits | 2026-03-26 |
+| [10-chat-api](.claude/tasks/10-chat-api.md) | POST /api/chat — send user message to AI and persist response | 2026-03-26 |
+| [11-get-ai-advices-api](.claude/tasks/11-get-ai-advices-api.md) | GET /api/ai-advices — retrieve latest 3 AI advice records | 2026-03-26 |
+| [12-restart-ai-session-api](.claude/tasks/12-restart-ai-session-api.md) | POST /api/ai-session/restart — manually restart AI session | 2026-03-26 |
+| [13-session-summary-on-restart](.claude/tasks/13-session-summary-on-restart.md) | Replace history replay on restart with compact JSON session summary | 2026-03-27 |
+| [14-on-demand-ai-analysis-api](.claude/tasks/14-on-demand-ai-analysis-api.md) | POST /api/ai/analyze — on-demand analysis replacing 5-min cron job | 2026-03-27 |
 
 ## Health Check
 
