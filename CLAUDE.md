@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Tech Stack
 
 - **Runtime:** Node.js v20+ with TypeScript
-- **Frontend:** React + Vite + Tailwind CSS + Lucide Icons
+- **Frontend:** React 18 + Vite + Tailwind CSS + Lucide Icons + socket.io-client + react-markdown
 - **Backend:** Express.js + Socket.io (real-time streaming)
 - **Database:** SQLite via Prisma ORM
 - **AI:** Multi-provider LLM support — Google Gemini, OpenAI, Claude (persistent chat session, lazy-initialized)
@@ -19,6 +19,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Repository Structure
 
 ```
+client/    # React frontend — single-page trading dashboard
+  src/
+    components/       # UI components (StatusBar, ConversationPanel, etc.)
+    hooks/            # useSocket, useStatus, useTrades
+    api/              # fetch wrappers per domain (chat, trades, analysis, etc.)
+    App.tsx           # Root layout
+    main.tsx          # Vite entry point
+  vite.config.ts      # Vite + Tailwind + proxy to backend
+
 server/    # Express backend — market data, AI session, Socket.io
   src/
     index.ts          # Entry point: Express + Socket.io server
@@ -41,6 +50,10 @@ npm run build            # compile TypeScript to dist/
 npx prisma migrate dev   # apply schema changes and generate client
 npx prisma generate      # regenerate client without migrating
 npx prisma studio        # inspect SQLite database
+
+# From client/
+npm run dev              # start frontend dev server on http://localhost:5173
+npm run build            # build frontend for production
 ```
 
 ## Completed Tasks
@@ -64,6 +77,13 @@ npx prisma studio        # inspect SQLite database
 | [15-get-analysis-message-api](.claude/tasks/15-get-analysis-message-api.md) | POST /api/ai/analyze/message — return analysis payload without sending to AI | 2026-03-28 |
 | [16-market-summary-api](.claude/tasks/16-market-summary-api.md) | POST /api/market-summary — save external market context included in analysis payload | 2026-03-29 |
 | [17-other-indexes-api](.claude/tasks/17-other-indexes-api.md) | POST /api/other_indexes — manually feed intraday VIX/ADD/TICK history included in analysis payload | 2026-03-30 |
+| [51-init-client](.claude/tasks/51-init-client.md) | Scaffold React client — Vite + Tailwind dark + socket.io-client + base layout | — |
+| [52-status-bar](.claude/tasks/52-status-bar.md) | Status bar — server health, AI state, ET clock, market hours, restart button | — |
+| [53-conversation-panel](.claude/tasks/53-conversation-panel.md) | AI conversation panel + chat/analyze input with Socket.io integration | — |
+| [54-preview-analysis-prompt](.claude/tasks/54-preview-analysis-prompt.md) | Preview analysis prompt panel with Copy button | — |
+| [55-open-positions](.claude/tasks/55-open-positions.md) | Open positions table + exit/delete actions + new trade form | — |
+| [56-market-summary-input](.claude/tasks/56-market-summary-input.md) | Market summary textarea input | — |
+| [57-other-indexes-panel](.claude/tasks/57-other-indexes-panel.md) | Other indexes slide-out panel (VIX/ADD/TICK, hideable, clears on save) | — |
 
 ## API Reference
 
