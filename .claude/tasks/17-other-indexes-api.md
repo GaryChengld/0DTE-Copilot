@@ -1,4 +1,4 @@
-# Task 17 — Market Internals History API
+# Task 17 — Other Indexes API ✅ COMPLETED
 
 ## Goal
 

@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Backend:** Express.js + Socket.io (real-time streaming)
 - **Database:** SQLite via Prisma ORM
 - **AI:** Multi-provider LLM support — Google Gemini, OpenAI, Claude (persistent chat session, lazy-initialized)
-- **Market Data:** `yahoo-finance2` (on-demand 5-min OHLC + daily candles for SPX, SPY, VIX)
+- **Market Data:** `yahoo-finance2` (on-demand 5-min OHLC + daily candles for SPX and SPY)
 - **Indicators:** `technicalindicators` library (VWAP, SMA, RSI)
 
 ## Repository Structure
@@ -26,6 +26,7 @@ server/    # Express backend — market data, AI session, Socket.io
     routes/           # Express route handlers
     services/         # Business logic (marketData, aiSession, llm providers)
     db/               # Prisma client + repositories
+    utils/            # Shared utilities (marketHours)
     generated/prisma/ # Auto-generated Prisma client (do not edit)
   prisma/
     schema.prisma     # DB schema: AiAdvice, Trade, TradeExit, MarketSummary, OtherIndexSnapshot
@@ -62,7 +63,7 @@ npx prisma studio        # inspect SQLite database
 | [14-on-demand-ai-analysis-api](.claude/tasks/14-on-demand-ai-analysis-api.md) | POST /api/ai/analyze — on-demand analysis replacing 5-min cron job | 2026-03-27 |
 | [15-get-analysis-message-api](.claude/tasks/15-get-analysis-message-api.md) | POST /api/ai/analyze/message — return analysis payload without sending to AI | 2026-03-28 |
 | [16-market-summary-api](.claude/tasks/16-market-summary-api.md) | POST /api/market-summary — save external market context included in analysis payload | 2026-03-29 |
-| [17-other-indexes-api](.claude/tasks/17-other-indexes-api.md) | POST /api/other_indexes — manually feed intraday VIX/ADD/TICK history included in analysis payload | 2026-03-29 |
+| [17-other-indexes-api](.claude/tasks/17-other-indexes-api.md) | POST /api/other_indexes — manually feed intraday VIX/ADD/TICK history included in analysis payload | 2026-03-30 |
 
 ## API Reference
 
@@ -93,7 +94,7 @@ npx prisma studio        # inspect SQLite database
 ### Core Trading Logic (hierarchical, order matters)
 
 1. **VWAP (The Anchor):** Cumulative from 09:30 AM ET. Price above/below VWAP = primary Bullish/Bearish bias.
-2. **Market Internals:** $ADD (breadth) confirms or contradicts the VWAP bias. ($TICK support planned.)
+2. **Market Internals:** $ADD (breadth) and $TICK (NYSE tick) confirm or contradict the VWAP bias — fed manually via `POST /api/other_indexes`.
 3. **Gamma Map:** User-supplied GEX levels (Call Wall, GEX Flip, Put Wall) stored via `/api/market-summary` identify reversal/breakout zones.
 4. **AI Copilot:** Persistent LLM session (lazy-initialized on first use), triggered on-demand. Operates in two modes:
    - **Observation Mode** — scanning for high-probability entry setups
@@ -103,11 +104,12 @@ npx prisma studio        # inspect SQLite database
 
 | Module | Responsibility |
 |---|---|
-| `services/marketData.ts` | On-demand fetch of all today's 5-min RTH candles (SPX, SPY, VIX) + daily closes for MA/RSI |
-| `services/aiSession.ts` | Lazy-initialized LLM session; auto-restarts on analysis trigger; session summary on restart |
+| `services/marketData.ts` | Fetches today's 5-min RTH candles (SPX, SPY) + 300 days daily closes; builds 15m aggregation, last-6 5m candles, VWAP, RSI, MAs |
+| `services/aiSession.ts` | Lazy-initialized LLM session; send + background restart after analysis; session summary on restart |
 | `routes/analysis.ts` | Builds analysis payload and sends to AI (`/api/ai/analyze`) or returns it (`/api/ai/analyze/message`) |
 | `db/marketSummaryRepository.ts` | Stores and retrieves user-supplied market context (GEX, options data) |
-| `db/otherIndexesRepository.ts` | Appends and retrieves today's intraday VIX/ADD/TICK snapshots |
+| `db/otherIndexesRepository.ts` | Upserts and retrieves today's intraday VIX/ADD/TICK snapshots by `tradeDate` + `time` |
+| `utils/marketHours.ts` | Helper to check if current time is within RTH (Mon–Fri 09:30–16:00 ET) |
 | Socket.io layer | Broadcasts AI responses to frontend via `chat:response` event |
 
 ### Analysis Payload
@@ -156,19 +158,20 @@ When analysis is triggered, the following JSON is sent to AI:
 ```
 User triggers POST /api/ai/analyze
               ↓
-    fetchMarketData() — Yahoo Finance (5-min + daily candles)
-    findOpenTrades()  — SQLite
-    getLatestMarketSummary() — SQLite
-    getTodayOtherIndexSnapshots() — SQLite
+    fetchMarketData()            — Yahoo Finance (5-min + daily candles), parallel
+    findOpenTrades()             — SQLite                                  parallel
+    getLatestMarketSummary()     — SQLite                                  parallel
+    getTodayOtherIndexSnapshots() — SQLite                                 parallel
               ↓
-    buildAnalysisPayload() — VWAP, RSI, MA via technicalindicators
-              ↓
-    restartAISession() — summarize + reinitialize LLM
+    buildAnalysisPayload() — assemble JSON, aggregate 15m candles
               ↓
     sendToAI(payload) — LLM provider (Gemini / OpenAI / Claude)
               ↓
     createAiAdvice() — persist to SQLite
     io.emit("chat:response") — broadcast via Socket.io
+    return response to caller
+              ↓ (background, fire-and-forget)
+    restartAISession() — generate summary → store → reinitialize
 ```
 
 ## Environment Variables
@@ -178,7 +181,9 @@ Create `server/.env` (gitignored). See `server/.env.example`:
 - `OPENAI_API_KEY` — OpenAI API key
 - `ANTHROPIC_API_KEY` — Anthropic (Claude) API key
 - `LLM_PROVIDER` — `gemini` | `openai` | `claude` (default: `gemini`)
-- `GEMINI_MODEL` / `OPENAI_MODEL` / `CLAUDE_MODEL` — model overrides
+- `GEMINI_MODEL` — default `gemini-2.0-flash`
+- `OPENAI_MODEL` — default `gpt-4o`
+- `CLAUDE_MODEL` — default `claude-opus-4-6`
 - `DATABASE_URL` — Prisma SQLite path (e.g., `file:./dev.db`)
 - `PORT` — server port (default `3001`)
 - `PROMPT_FILE` — which prompt file to load (default: `strategicPrompt.md`)

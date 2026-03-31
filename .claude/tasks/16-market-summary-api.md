@@ -1,4 +1,4 @@
-# Task 16 — Market Summary API
+# Task 16 — Market Summary API ✅ COMPLETED
 
 ## Goal
 
