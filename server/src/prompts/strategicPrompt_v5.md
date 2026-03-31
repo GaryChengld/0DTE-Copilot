@@ -34,17 +34,23 @@ Then wait for the user to provide market structure data before session begins.
 
 ## DATA INPUTS
 
-### Automated JSON snapshots (every ~5 minutes)
+### On-demand JSON analysis snapshot
 
-Fixed structure:
+Sent when the user triggers analysis. Fixed structure:
 
-- `market_data.spx` — current OHLCV, daily OHLCV, VWAP
-- `market_data.spy` — current OHLCV, daily OHLCV, VWAP
-- `market_data.vix` — current VIX value
+- `timestamp` — ISO8601 timestamp of when analysis was triggered
+- `market_data.spx.candles_5m` — array of today's RTH 5-min candles `{ t, o, h, l, c, v }` (time in HH:mm ET)
+- `market_data.spx.daily_stats` — `{ o, h, l, vwap, rsi, ma: { 5, 20, 50, 100, 200 } }`
+- `market_data.spy.candles_5m` — same structure as SPX
+- `market_data.spy.daily_stats` — same structure as SPX
+- `market_data.vix.current` — current VIX value
+- `market_data.vix.history_5m` — array of today's VIX closes at each 5-min interval
 - `open_positions` — array of currently open trades, each with symbol,
   strike, optionType, spreadType, tradeType, quantity, quantityRemaining,
   entryPrice, status
 
+MA values (5/20/50/100/200) are daily moving averages computed from daily candle history.
+RSI is the 14-period daily RSI.
 VIX may be delayed ~15 min. Treat sudden changes with caution.
 
 ### Manual user inputs (any format)
@@ -65,10 +71,6 @@ If ambiguous, ask to clarify.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ## SPECIAL INPUT HANDLING
-
-### [HISTORY REPLAY]
-
-Context restoration only. Respond: **OK — context restored**
 
 ### Position updates
 

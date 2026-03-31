@@ -62,10 +62,7 @@ export async function initAISession(): Promise<void> {
 }
 
 export async function sendToAI(message: string, restart: boolean = false): Promise<string> {
-  if (restart) {
-    console.log("[aiSession] restart requested, restarting session before send...");
-    await restartAISession();
-  } else if (!provider) {
+  if (!provider) {
     console.log("[aiSession] session uninitialized, auto-initializing...");
     await initAISession();
   }
@@ -108,9 +105,16 @@ export async function sendToAI(message: string, restart: boolean = false): Promi
   }
 
   messageCount++;
-  if (messageCount >= config.sessionSummaryInterval) {
+  if (restart) {
+    console.log("[aiSession] restart requested, restarting session in background...");
+    restartAISession().catch((err) =>
+      console.error("[aiSession] background restart failed:", err instanceof Error ? err.message : err)
+    );
+  } else if (messageCount >= config.sessionSummaryInterval) {
     console.log(`[aiSession] message count reached ${messageCount}, triggering auto-restart`);
-    await restartAISession();
+    restartAISession().catch((err) =>
+      console.error("[aiSession] auto-restart failed:", err instanceof Error ? err.message : err)
+    );
   }
 
   return response!;

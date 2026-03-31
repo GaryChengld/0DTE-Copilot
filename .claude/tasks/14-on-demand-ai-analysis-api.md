@@ -36,9 +36,13 @@ The returned JSON payload sent to AI must follow this schema:
 {
   "market_data": {
     "spx": {
+      "candles_15m": [
+        { "t": "09:30", "o": 5120.1, "h": 5128.0, "l": 5118.2, "c": 5125.8, "v": 121000000 },
+        { "t": "09:45", "o": 5125.8, "h": 5132.4, "l": 5123.1, "c": 5130.2, "v": 98000000 }
+      ],
       "candles_5m": [
-        { "t": "09:30", "o": 5120.1, "h": 5125.4, "l": 5118.2, "c": 5122.3, "v": 45000000 },
-        { "t": "09:35", "o": 5122.3, "h": 5126.1, "l": 5121.0, "c": 5125.8, "v": 38000000 }
+        { "t": "11:00", "o": 5128.3, "h": 5131.2, "l": 5127.1, "c": 5130.5, "v": 22000000 },
+        { "t": "11:05", "o": 5130.5, "h": 5133.0, "l": 5129.2, "c": 5132.1, "v": 19000000 }
       ],
       "daily_stats": {
         "o": 5110.5, "h": 5130.2, "l": 5105.8, "vwap": 5121.5,
@@ -47,9 +51,6 @@ The returned JSON payload sent to AI must follow this schema:
       }
     },
     "spy": {
-      "candles_5m": [
-        { "t": "09:30", "o": 511.5, "h": 512.1, "l": 510.9, "c": 511.8, "v": 1250000 }
-      ],
       "daily_stats": {
         "o": 510.2, "h": 512.8, "l": 509.4, "vwap": 511.4,
         "rsi": 57.9,
@@ -65,7 +66,8 @@ The returned JSON payload sent to AI must follow this schema:
 ```
 
 **Indicator computation notes:**
-- `candles_5m`: all RTH 5-min candles for today (9:30 AM ET onward), ascending by time
+- `candles_15m`: all RTH 15-min candles from market open (aggregated from 5-min candles), ascending
+- `candles_5m`: latest 6 RTH 5-min candles only (last ~30 minutes of price action)
 - `daily_stats.o/h/l`: derived from all today's 5-min candles (open of first candle, running high/low)
 - `daily_stats.vwap`: cumulative VWAP from today's 5-min candles using existing `calculateVwap()`; use SPY volume for SPX
 - `daily_stats.rsi`: 14-period RSI from Yahoo Finance daily quote (no manual calculation needed)
@@ -78,14 +80,28 @@ The returned JSON payload sent to AI must follow this schema:
 POST /api/ai/analyze
 ```
 
+Request body (optional):
+```json
+{ "user_notes": "GEX FLIP at 5500, ADD -650, VIX spiking" }
+```
+
 Handler logic:
-1. Call `fetchMarketData()` — get live SPX/SPY/VIX data (existing function)
-2. Call `findOpenTrades()` — get active positions
-3. Build message payload (same JSON structure currently sent by the job)
-4. Call `sendToAI(message)` — send to AI session
-5. Call `createAiAdvice({ source: "user", prompt: message, response: aiResponse })` — persist both prompt and response
-6. Call `io.emit("chat:response", ...)` — broadcast via Socket.io
-7. Return `{ response: aiResponse }` with HTTP 200
+1. Read optional `user_notes` string from request body
+2. Call `fetchMarketData()` — get live SPX/SPY/VIX data
+3. Call `findOpenTrades()` — get active positions
+4. Build message payload including `user_notes` if provided:
+   ```json
+   {
+     "timestamp": "<ISO8601>",
+     "market_data": { ... },
+     "open_positions": [ ... ],
+     "user_notes": "GEX FLIP at 5500, ADD -650, VIX spiking"
+   }
+   ```
+5. Call `sendToAI(message, true)` — send to AI session
+6. Call `createAiAdvice({ source: "user", prompt: message, response: aiResponse })` — persist both prompt and response
+7. Call `io.emit("chat:response", ...)` — broadcast via Socket.io
+8. Return `{ response: aiResponse }` with HTTP 200
 
 Error handling: return HTTP 500 with `{ error: message }` on failure.
 
@@ -102,8 +118,8 @@ Error handling: return HTTP 500 with `{ error: message }` on failure.
 - Remove `isSessionAvailable()` export — no longer needed
 - Remove `scheduleDailyReset()` export — no longer needed
 - In `sendToAI()`: if `provider` is `null` (uninitialized), call `initAISession()` before sending
-- Add `restart: boolean` parameter to `sendToAI(message, restart)` — if `true`, call `restartAISession()` before sending
-- Pass `restart: true` in `POST /api/ai/analyze` (analysis route) — always restart session before analysis
+- Add `restart: boolean` parameter to `sendToAI(message, restart)` — if `true`, call `restartAISession()` after sending
+- Pass `restart: true` in `POST /api/ai/analyze` (analysis route) — always restart session after analysis
 - Pass `restart: false` everywhere else (`POST /api/chat`, Socket.io `chat:message` handler)
 
 ### Modify: `server/src/routes/status.ts`

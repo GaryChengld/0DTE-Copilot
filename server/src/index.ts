@@ -5,7 +5,9 @@ import { config } from "./config.js";
 import statusRouter from "./routes/status.js";
 import tradesRouter from "./routes/trades.js";
 import chatRouter from "./routes/chat.js";
-import { createAnalysisRouter } from "./routes/analysis.js";
+import analysisRouter, { initAnalysisRouter } from "./routes/analysis.js";
+import marketSummaryRouter from "./routes/marketSummary.js";
+import otherIndexesRouter from "./routes/otherIndexes.js";
 import { sendToAI } from "./services/aiSession.js";
 import { createAiAdvice } from "./db/ingestionRepository.js";
 
@@ -21,7 +23,10 @@ app.use(express.json());
 app.use("/api", statusRouter);
 app.use("/api", tradesRouter);
 app.use("/api", chatRouter);
-app.use("/api", createAnalysisRouter(io));
+initAnalysisRouter(io);
+app.use("/api", analysisRouter);
+app.use("/api", marketSummaryRouter);
+app.use("/api", otherIndexesRouter);
 
 // Socket.io
 io.on("connection", (socket) => {

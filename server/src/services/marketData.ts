@@ -1,5 +1,5 @@
 import YahooFinance from "yahoo-finance2";
-import { calculateVwap } from "./vwap.js";
+import { SMA, RSI, VWAP } from "technicalindicators";
 
 const yahooFinance = new YahooFinance();
 
@@ -62,18 +62,19 @@ export interface DailyStats {
   };
 }
 
-export interface TickerMarketData {
+export interface SpxMarketData {
+  candles_15m: Candle5m[];
   candles_5m: Candle5m[];
   daily_stats: DailyStats;
 }
 
+export interface SpyMarketData {
+  daily_stats: DailyStats;
+}
+
 export interface MarketData {
-  spx: TickerMarketData;
-  spy: TickerMarketData;
-  vix: {
-    current: number;
-    history_5m: number[];
-  };
+  spx: SpxMarketData;
+  spy: SpyMarketData;
 }
 
 // --- Helpers ---
@@ -105,31 +106,25 @@ function formatTimeET(date: Date): string {
   return `${hour}:${minute}`;
 }
 
+function calcVwap(candles: RTHCandle[]): number | null {
+  if (candles.length === 0) return null;
+  const result = VWAP.calculate({
+    high: candles.map((c) => c.high),
+    low: candles.map((c) => c.low),
+    close: candles.map((c) => c.close),
+    volume: candles.map((c) => c.volume),
+  });
+  return result.length > 0 ? Math.round(result[result.length - 1] * 100) / 100 : null;
+}
+
 function calcMA(closes: number[], period: number): number | null {
-  if (closes.length < period) return null;
-  const slice = closes.slice(-period);
-  return Math.round((slice.reduce((sum, c) => sum + c, 0) / period) * 100) / 100;
+  const result = SMA.calculate({ period, values: closes });
+  return result.length > 0 ? Math.round(result[result.length - 1] * 100) / 100 : null;
 }
 
 function calcRSI(closes: number[], period: number = 14): number | null {
-  if (closes.length < period + 1) return null;
-
-  const changes = closes.slice(1).map((c, i) => c - closes[i]);
-
-  let avgGain = changes.slice(0, period).filter((c) => c > 0).reduce((s, c) => s + c, 0) / period;
-  let avgLoss =
-    changes
-      .slice(0, period)
-      .filter((c) => c < 0)
-      .reduce((s, c) => s + Math.abs(c), 0) / period;
-
-  for (const change of changes.slice(period)) {
-    avgGain = (avgGain * (period - 1) + Math.max(change, 0)) / period;
-    avgLoss = (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
-  }
-
-  if (avgLoss === 0) return 100;
-  return Math.round((100 - 100 / (1 + avgGain / avgLoss)) * 100) / 100;
+  const result = RSI.calculate({ period, values: closes });
+  return result.length > 0 ? Math.round(result[result.length - 1] * 100) / 100 : null;
 }
 
 // --- Fetch helpers ---
@@ -172,46 +167,43 @@ async function fetchDailyCloses(symbol: string, days: number): Promise<number[]>
   return (result.quotes ?? []).filter((q) => q.close != null).map((q) => q.close!);
 }
 
-async function fetchVixData(): Promise<{ current: number; history_5m: number[] }> {
-  const period1 = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const todayET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
-
-  const result = (await yahooFinance.chart("^VIX", {
-    period1,
-    interval: "5m" as const,
-  })) as unknown as YFChartResult;
-
-  const todayCandles = (result.quotes ?? []).filter((q) => {
-    if (q.date == null || q.close == null) return false;
-    const candleDateET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(q.date);
-    return candleDateET === todayET && isRTHCandle(q.date);
-  });
-
-  return {
-    current: result.meta?.regularMarketPrice ?? 0,
-    history_5m: todayCandles.map((q) => q.close!),
-  };
-}
-
 // --- Main export ---
 
 export async function fetchMarketData(): Promise<MarketData> {
-  const [spxResult, spyResult, spxDailyCloses, spyDailyCloses, vixData] = await Promise.all([
+  const [spxResult, spyResult, spxDailyCloses, spyDailyCloses] = await Promise.all([
     fetchTodayRTHCandles("^GSPC"),
     fetchTodayRTHCandles("SPY"),
-    fetchDailyCloses("^GSPC", 210),
-    fetchDailyCloses("SPY", 210),
-    fetchVixData(),
+    fetchDailyCloses("^GSPC", 300),
+    fetchDailyCloses("SPY", 300),
   ]);
+
+  const r2 = (n: number) => Math.round(n * 100) / 100;
 
   const toCandle5m = (candle: RTHCandle): Candle5m => ({
     t: formatTimeET(candle.date),
-    o: candle.open,
-    h: candle.high,
-    l: candle.low,
-    c: candle.close,
+    o: r2(candle.open),
+    h: r2(candle.high),
+    l: r2(candle.low),
+    c: r2(candle.close),
     v: candle.volume,
   });
+
+  const buildCandles15m = (candles: RTHCandle[]): Candle5m[] => {
+    const result: Candle5m[] = [];
+    for (let i = 0; i < candles.length; i += 3) {
+      const group = candles.slice(i, i + 3);
+      if (group.length === 0) break;
+      result.push({
+        t: formatTimeET(group[0].date),
+        o: r2(group[0].open),
+        h: r2(Math.max(...group.map((c) => c.high))),
+        l: r2(Math.min(...group.map((c) => c.low))),
+        c: r2(group[group.length - 1].close),
+        v: group.reduce((sum, c) => sum + c.volume, 0),
+      });
+    }
+    return result;
+  };
 
   const buildDailyStats = (
     candles: RTHCandle[],
@@ -221,10 +213,10 @@ export async function fetchMarketData(): Promise<MarketData> {
   ): DailyStats => {
     const hasCandles = candles.length > 0;
     return {
-      o: hasCandles ? candles[0].open : (meta.regularMarketOpen ?? 0),
-      h: hasCandles ? Math.max(...candles.map((c) => c.high)) : (meta.regularMarketDayHigh ?? 0),
-      l: hasCandles ? Math.min(...candles.map((c) => c.low)) : (meta.regularMarketDayLow ?? 0),
-      vwap: calculateVwap(vwapCandles),
+      o: r2(hasCandles ? candles[0].open : (meta.regularMarketOpen ?? 0)),
+      h: r2(hasCandles ? Math.max(...candles.map((c) => c.high)) : (meta.regularMarketDayHigh ?? 0)),
+      l: r2(hasCandles ? Math.min(...candles.map((c) => c.low)) : (meta.regularMarketDayLow ?? 0)),
+      vwap: calcVwap(vwapCandles),
       rsi: calcRSI(dailyCloses),
       ma: {
         "5": calcMA(dailyCloses, 5),
@@ -244,13 +236,12 @@ export async function fetchMarketData(): Promise<MarketData> {
 
   return {
     spx: {
-      candles_5m: spxResult.candles.map(toCandle5m),
+      candles_15m: buildCandles15m(spxResult.candles),
+      candles_5m: spxResult.candles.slice(-6).map(toCandle5m),
       daily_stats: buildDailyStats(spxResult.candles, spxWithSpyVolume, spxDailyCloses, spxResult.meta),
     },
     spy: {
-      candles_5m: spyResult.candles.map(toCandle5m),
       daily_stats: buildDailyStats(spyResult.candles, spyResult.candles, spyDailyCloses, spyResult.meta),
     },
-    vix: vixData,
   };
 }

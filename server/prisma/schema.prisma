@@ -9,6 +9,24 @@ datasource db {
   provider = "sqlite"
 }
 
+model MarketSummary {
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime @default(now())
+  data      Json     // flexible — any JSON object or { content: "markdown string" }
+}
+
+model OtherIndexSnapshot {
+  id        Int    @id @default(autoincrement())
+  tradeDate String // YYYY-MM-DD (ET)
+  time      String // HH:MM (ET), e.g. "09:35"
+  vix       Float?
+  add       Float? // $ADD NYSE breadth
+  tick      Float? // $TICK NYSE tick
+
+  @@unique([tradeDate, time])
+  @@index([tradeDate])
+}
+
 model AiAdvice {
   id        Int      @id @default(autoincrement())
   timestamp DateTime @default(now())
