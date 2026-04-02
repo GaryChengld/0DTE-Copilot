@@ -1,16 +1,17 @@
 import { useState } from "react";
+import StatusBar from "./components/StatusBar";
+import ConversationPanel from "./components/ConversationPanel";
+import ChatInputBar from "./components/ChatInputBar";
 
 type Tab = "conversation" | "preview";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("conversation");
+  const [marketSummaryOpen, setMarketSummaryOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Status bar */}
-      <header className="h-10 bg-gray-900 border-b border-gray-800 flex items-center px-4 shrink-0">
-        <span className="text-sm text-gray-400">Status Bar — Task 52</span>
-      </header>
+      <StatusBar onOpenMarketSummary={() => setMarketSummaryOpen(true)} />
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
@@ -41,18 +42,16 @@ export default function App() {
           </div>
 
           {/* Active tab content */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {activeTab === "conversation" && (
-              <p className="text-gray-500 text-sm">AI Conversation — Task 53</p>
-            )}
+          <div className="flex-1 overflow-y-auto py-4 px-[4%]">
+            {activeTab === "conversation" && <ConversationPanel />}
             {activeTab === "preview" && (
               <p className="text-gray-500 text-sm">Preview Prompt — Task 54</p>
             )}
           </div>
 
           {/* Chat input bar */}
-          <div className="h-24 border-t border-gray-800 p-3 shrink-0">
-            <p className="text-gray-500 text-sm">Chat Input — Task 53</p>
+          <div className="h-24 border-t border-gray-800 py-3 px-[4%] shrink-0">
+            <ChatInputBar />
           </div>
         </div>
 
@@ -61,6 +60,27 @@ export default function App() {
           <p className="text-gray-500 text-sm">Open Positions + Trade Form — Task 55</p>
         </aside>
       </div>
+
+      {/* Market Summary modal placeholder — Task 56 */}
+      {marketSummaryOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-40"
+          onClick={() => setMarketSummaryOpen(false)}
+        >
+          <div
+            className="bg-gray-900 border border-gray-700 rounded p-6 w-96"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-gray-400 text-sm">Market Summary — Task 56</p>
+            <button
+              className="mt-4 text-xs text-gray-500 hover:text-gray-300"
+              onClick={() => setMarketSummaryOpen(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Other Indexes slide-out — Task 57 */}
     </div>

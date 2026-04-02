@@ -41,17 +41,17 @@ interface AiAdvice {
 
 ### New: `client/src/components/ChatInputBar.tsx`
 
-Two modes in one bar:
+Two buttons share one textarea:
 
-**Chat mode:**
-- Textarea (Ctrl+Enter or [Send] button) → `POST /api/chat` with `{ message }`
+**[Send] button (or Ctrl+Enter):**
+- Sends textarea content → `POST /api/chat` with `{ message }`
+- Clears textarea on send
 - Response arrives via Socket.io; no need to parse HTTP response body for display
 
-**Analyze mode:**
-- Optional `user_notes` text input (single line, collapsible)
-- `[Analyze ▶]` button → `POST /api/ai/analyze` with optional `{ user_notes }`
-- Button disables + shows spinner on click
-- Re-enables when `chat:response` Socket.io event is received
+**[Analyze] button:**
+- Sends textarea content as `user_notes` → `POST /api/ai/analyze` with `{ user_notes }` (omitted if empty)
+- Clears textarea on click
+- Disables + shows spinner until `chat:response` Socket.io event is received
 - Note: session restarts in background after analysis — no UI action needed
 
 ## Done When

@@ -52,7 +52,8 @@ async function createSession(): Promise<void> {
   const summary = await getTodaySessionSummary();
   if (summary) {
     console.log("[aiSession] injecting today's session summary as context");
-    await sendToAI(`[SESSION CONTEXT] ${summary}`);
+    const contextResponse = await provider.send(`[SESSION CONTEXT] ${summary}`);
+    if (contextResponse) console.log("[AI response]\n", contextResponse);
   }
 }
 
