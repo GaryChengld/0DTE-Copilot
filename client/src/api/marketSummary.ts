@@ -1,7 +1,8 @@
 export async function saveMarketSummary(content: string): Promise<void> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    const normalized = content.replace(/(\d)_(\d)/g, "$1$2");
+    parsed = JSON.parse(normalized);
   } catch {
     parsed = content;
   }

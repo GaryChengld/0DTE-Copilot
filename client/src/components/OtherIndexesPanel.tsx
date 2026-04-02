@@ -12,10 +12,9 @@ function currentETTime(): string {
 
 interface OtherIndexesPanelProps {
   open: boolean;
-  onClose: () => void;
 }
 
-export default function OtherIndexesPanel({ open, onClose }: OtherIndexesPanelProps) {
+export default function OtherIndexesPanel({ open }: OtherIndexesPanelProps) {
   const [time, setTime] = useState("");
   const [vix, setVix] = useState("");
   const [add, setAdd] = useState("");
@@ -60,9 +59,10 @@ export default function OtherIndexesPanel({ open, onClose }: OtherIndexesPanelPr
     <>
       {/* Slide-out panel */}
       <div
-        className={`fixed top-10 right-0 h-[calc(100%-2.5rem)] w-[220px] bg-gray-900 border-l border-gray-700 shadow-xl z-30 flex flex-col transition-transform duration-300 ${
+        className={`fixed top-10 right-0 h-[calc(100%-2.5rem)] w-[220px] shadow-xl z-30 flex flex-col transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
+        style={{ background: "var(--bg-panel)", borderLeft: "1px solid var(--border)" }}
       >
         <div className="px-4 py-3 border-b border-gray-700 shrink-0">
           <p className="text-sm font-semibold text-gray-100">Other Indexes</p>

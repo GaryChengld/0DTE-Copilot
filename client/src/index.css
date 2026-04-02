@@ -1,6 +1,16 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+:root {
+  --bg-primary:  #0f1117;
+  --bg-panel:    #161b22;
+  --bg-card:     #1c2333;
+  --bg-elevated: #2d333b;
+  --text-muted:  #8b949e;
+  --border:      #30363d;
+}
+
 body {
-  @apply bg-gray-950 text-gray-100;
+  background-color: var(--bg-primary);
+  color: #e6edf3;
 }

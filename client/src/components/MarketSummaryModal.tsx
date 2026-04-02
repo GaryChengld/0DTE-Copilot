@@ -43,7 +43,8 @@ export default function MarketSummaryModal({ onClose }: MarketSummaryModalProps)
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl w-[720px] flex flex-col"
+        className="rounded-lg shadow-xl w-[720px] flex flex-col"
+        style={{ background: "var(--bg-panel)", border: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -64,7 +65,8 @@ export default function MarketSummaryModal({ onClose }: MarketSummaryModalProps)
             onChange={(e) => setContent(e.target.value)}
             rows={11}
             placeholder="GEX flip 5500, call wall 5700, put wall 5300, VIX 18..."
-            className="w-full resize-none bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-gray-500"
+            className="w-full resize-none rounded px-3 py-2 text-sm placeholder-gray-600 focus:outline-none"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border)", color: "#e6edf3" }}
           />
 
           <div className="flex items-center justify-between">

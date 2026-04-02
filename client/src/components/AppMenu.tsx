@@ -54,7 +54,7 @@ export default function AppMenu({ onOpenMarketSummary }: AppMenuProps) {
         </button>
 
         {open && (
-          <div className="absolute left-0 top-full mt-1 w-48 bg-gray-800 border border-gray-700 rounded shadow-lg z-50">
+          <div className="absolute left-0 top-full mt-1 w-48 rounded shadow-lg z-50" style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}>
             <button
               onClick={handleRestartClick}
               disabled={restarting}
@@ -78,7 +78,8 @@ export default function AppMenu({ onOpenMarketSummary }: AppMenuProps) {
           onClick={() => setConfirmOpen(false)}
         >
           <div
-            className="bg-gray-800 border border-gray-700 rounded-lg p-6 w-80 shadow-xl"
+            className="rounded-lg p-6 w-80 shadow-xl"
+            style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-gray-100 text-sm font-medium mb-1">Restart AI Session</p>

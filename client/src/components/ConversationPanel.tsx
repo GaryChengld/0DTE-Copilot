@@ -108,14 +108,27 @@ export default function ConversationPanel() {
       )}
 
       {messages.map((msg) => (
-        <div key={msg.key} className="flex flex-col gap-1">
+        <div
+          key={msg.key}
+          className="flex flex-col gap-2 rounded-lg py-[1%] px-[2%]"
+          style={{
+            background: "var(--bg-card)",
+            borderLeft: msg.source === "chat" ? "3px solid #58a6ff" : "3px solid #3fb950",
+          }}
+        >
           <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-0.5 rounded font-medium bg-blue-900 text-blue-300">
+            <span
+              className="text-xs px-2 py-0.5 rounded font-medium"
+              style={{
+                background: msg.source === "chat" ? "#2d333b" : "#1a3a2a",
+                color: msg.source === "chat" ? "#58a6ff" : "#3fb950",
+              }}
+            >
               {msg.source}
             </span>
-            <span className="text-xs text-gray-400 ml-auto">{msg.displayTime}</span>
+            <span className="text-xs ml-auto" style={{ color: "var(--text-muted)" }}>{msg.displayTime}</span>
           </div>
-          <div className="prose prose-invert max-w-none text-gray-200">
+          <div className="prose prose-invert max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.response}</ReactMarkdown>
           </div>
         </div>

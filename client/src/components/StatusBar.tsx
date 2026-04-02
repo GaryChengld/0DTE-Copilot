@@ -71,7 +71,7 @@ export default function StatusBar({ onOpenMarketSummary, indexesOpen, onToggleIn
       : "bg-gray-800 text-gray-400";
 
   return (
-    <header className="h-10 bg-gray-900 border-b border-gray-800 flex items-center px-4 shrink-0">
+    <header className="h-10 flex items-center px-4 shrink-0" style={{ background: "var(--bg-panel)", borderBottom: "1px solid var(--border)" }}>
       {/* Left: menu + title */}
       <AppMenu onOpenMarketSummary={onOpenMarketSummary} />
       <span className="ml-2 text-base font-bold text-gray-100 tracking-wide">0 DTE Copilot</span>
@@ -85,8 +85,8 @@ export default function StatusBar({ onOpenMarketSummary, indexesOpen, onToggleIn
         <span className={`text-xs font-mono ${aiColor}`}>
           AI: {status ? `${status.ai.status} · ${status.ai.provider}` : "—"}
         </span>
-        <span className="text-gray-700">|</span>
-        <span className="text-xs font-mono text-gray-300">{clock}</span>
+        <span style={{ color: "var(--border)" }}>|</span>
+        <span className="text-xs font-mono text-white">{clock}</span>
         <span className={`text-xs px-2 py-0.5 rounded font-medium ${marketBadgeClass}`}>
           {marketStatus}
         </span>
