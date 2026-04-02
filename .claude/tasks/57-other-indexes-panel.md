@@ -1,9 +1,9 @@
-# Task 57 — Other Indexes Slide-out Panel
+# Task 57 — Other Indexes Slide-out Panel ✅ COMPLETED (2026-04-01)
 
 ## Goal
 
 Add a hideable right-edge slide-out panel for quickly entering intraday VIX, $ADD, and $TICK
-readings. Accessible at any time via a fixed tab on the right edge.
+readings. Toggled via an icon button in the status bar (far right).
 
 ## Changes
 
@@ -27,15 +27,14 @@ export async function saveOtherIndexes(data: {
 
 ### New: `client/src/components/OtherIndexesPanel.tsx`
 
-**Toggle tab:**
-- Fixed vertical tab on the right edge of the viewport (always visible)
-- Label: "Indexes" rotated 90°
-- Clicking slides panel in/out
+Props: `open: boolean`, `onClose: () => void`
 
 **Panel behavior:**
 - Slides in from the right (CSS transition), overlays content — does not push layout
-- Default: hidden
+- Starts below the status bar (`top-10`, `height: calc(100% - 2.5rem)`) — does not cover status bar
+- Default: hidden; toggled by the `PanelRightOpen` / `PanelRightClose` button in `StatusBar`
 - Width: ~220px
+- Clicking outside the panel does **not** close it — only the status bar toggle button does
 
 **Form fields:**
 - `Time` (text input, format HH:MM)
@@ -67,10 +66,17 @@ function currentETTime(): string {
 // Reset time to current ET whenever panel opens
 ```
 
+### Updated: `client/src/App.tsx`
+
+- Holds `indexesOpen: boolean` state
+- Passes `indexesOpen` and `onToggleIndexes` to `StatusBar`
+- Passes `open` and `onClose` to `OtherIndexesPanel`
+
 ## Done When
 
-- Fixed "Indexes" tab is visible on the right edge at all times
-- Clicking tab slides panel open/closed
+- Toggle button in status bar opens/closes the panel with switching icon
+- Panel slides in below the status bar without covering it
+- Clicking outside the panel does not close it
 - Time field defaults to current ET time on open
 - Saving clears VIX/ADD/TICK but keeps Time
 - Confirmation shows the echoed time from the server response

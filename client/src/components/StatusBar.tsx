@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PanelRightOpen, PanelRightClose } from "lucide-react";
 import { useStatus } from "../hooks/useStatus";
 import AppMenu from "./AppMenu";
 
@@ -31,9 +32,11 @@ function getMarketStatus(): "RTH" | "Pre-Market" | "Closed" {
 
 interface StatusBarProps {
   onOpenMarketSummary: () => void;
+  indexesOpen: boolean;
+  onToggleIndexes: () => void;
 }
 
-export default function StatusBar({ onOpenMarketSummary }: StatusBarProps) {
+export default function StatusBar({ onOpenMarketSummary, indexesOpen, onToggleIndexes }: StatusBarProps) {
   const status = useStatus();
   const [clock, setClock] = useState(getETTime);
 
@@ -87,6 +90,13 @@ export default function StatusBar({ onOpenMarketSummary }: StatusBarProps) {
         <span className={`text-xs px-2 py-0.5 rounded font-medium ${marketBadgeClass}`}>
           {marketStatus}
         </span>
+        <button
+          onClick={onToggleIndexes}
+          className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-100 transition-colors"
+          title={indexesOpen ? "Close Indexes panel" : "Open Indexes panel"}
+        >
+          {indexesOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+        </button>
       </div>
     </header>
   );

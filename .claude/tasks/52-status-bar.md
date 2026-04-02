@@ -65,13 +65,17 @@ Behavior:
 
 ### New: `client/src/components/StatusBar.tsx`
 
-Displays from left to right:
+Layout: `☰` menu + title on the left; statuses + indexes toggle on the right.
+
+Right side, left to right:
 - **Health dot**: green (`status === "ok"`), yellow (`degraded`), red (fetch failed / null)
 - **AI badge**: `uninitialized | ok | error` + provider name (e.g. `gemini`)
 - **ET clock**: updates every second via `setInterval`; format `HH:MM ET`
 - **Market hours badge**: `RTH` (green) / `Pre-Market` (yellow) / `Closed` (gray)
   - RTH = Mon–Fri 09:30–16:00 ET
-- **`☰` menu button** (right side): renders `AppMenu`
+- **Indexes toggle button** (far right): `PanelRightOpen` icon when panel is closed, `PanelRightClose` when open
+  - Clicking toggles the `OtherIndexesPanel` (Task 57)
+  - `indexesOpen: boolean` and `onToggleIndexes: () => void` received as props from `App`
 
 Market hours logic (client-side, mirrors `server/src/utils/marketHours.ts`):
 ```typescript
@@ -99,3 +103,4 @@ function getMarketStatus(): "RTH" | "Pre-Market" | "Closed" {
 - `☰` menu opens a dropdown with "Restart AI Session" and "Market Summary" items
 - Restart AI Session calls the API and shows a brief "Restarting…" state in the menu item
 - Clicking outside the menu closes it
+- Indexes toggle button shows `PanelRightOpen` / `PanelRightClose` icon based on panel state

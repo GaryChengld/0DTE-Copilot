@@ -79,11 +79,11 @@ npm run build            # build frontend for production
 | [17-other-indexes-api](.claude/tasks/17-other-indexes-api.md) | POST /api/other_indexes — manually feed intraday VIX/ADD/TICK history included in analysis payload | 2026-03-30 |
 | [51-init-client](.claude/tasks/51-init-client.md) | Scaffold React client — Vite + Tailwind dark + socket.io-client + base layout | 2026-03-30 |
 | [52-status-bar](.claude/tasks/52-status-bar.md) | Status bar — server health, AI state, ET clock, market hours, restart button | 2026-03-30 |
-| [53-conversation-panel](.claude/tasks/53-conversation-panel.md) | AI conversation panel + chat/analyze input with Socket.io integration | — |
-| [54-preview-analysis-prompt](.claude/tasks/54-preview-analysis-prompt.md) | Preview analysis prompt panel with Copy button | — |
+| [53-conversation-panel](.claude/tasks/53-conversation-panel.md) | AI conversation panel + chat/analyze input with Socket.io integration | 2026-04-01 |
+| [54-preview-analysis-prompt](.claude/tasks/54-preview-analysis-prompt.md) | Preview analysis prompt panel with Copy button | 2026-04-01 |
 | [55-open-positions](.claude/tasks/55-open-positions.md) | Open positions table + exit/delete actions + new trade form | — |
-| [56-market-summary-input](.claude/tasks/56-market-summary-input.md) | Market summary textarea input | — |
-| [57-other-indexes-panel](.claude/tasks/57-other-indexes-panel.md) | Other indexes slide-out panel (VIX/ADD/TICK, hideable, clears on save) | — |
+| [56-market-summary-input](.claude/tasks/56-market-summary-input.md) | Market summary textarea input | 2026-04-01 |
+| [57-other-indexes-panel](.claude/tasks/57-other-indexes-panel.md) | Other indexes slide-out panel (VIX/ADD/TICK, hideable, clears on save) | 2026-04-01 |
 
 ## API Reference
 

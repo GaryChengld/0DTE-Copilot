@@ -1,4 +1,4 @@
-# Task 53 — AI Conversation Panel + Chat Input
+# Task 53 — AI Conversation Panel + Chat Input ✅ COMPLETED (2026-04-01)
 
 ## Goal
 
@@ -41,18 +41,28 @@ interface AiAdvice {
 
 ### New: `client/src/components/ChatInputBar.tsx`
 
-Two buttons share one textarea:
+Props: `message`, `onMessageChange`, `activeTab: "conversation" | "preview"`, `onPreview: (userNotes: string) => void`
+
+The textarea and buttons are always visible below both tabs. The active tab controls which buttons appear:
+
+**On "conversation" tab — two buttons:**
 
 **[Send] button (or Ctrl+Enter):**
-- Sends textarea content → `POST /api/chat` with `{ message }`
+- Emits `socket.emit("chat:message", message)` via Socket.io
 - Clears textarea on send
-- Response arrives via Socket.io; no need to parse HTTP response body for display
+- Response arrives via `chat:response` Socket.io event
 
 **[Analyze] button:**
 - Sends textarea content as `user_notes` → `POST /api/ai/analyze` with `{ user_notes }` (omitted if empty)
 - Clears textarea on click
 - Disables + shows spinner until `chat:response` Socket.io event is received
 - Note: session restarts in background after analysis — no UI action needed
+
+**On "preview" tab — one button:**
+
+**[Preview Analysis] button (purple):**
+- Calls `onPreview(message.trim())` and clears textarea
+- Parent (`App`) converts this into a `PreviewTrigger` that is passed to `PreviewAnalysisPrompt`
 
 ## Done When
 

@@ -2,16 +2,32 @@ import { useState } from "react";
 import StatusBar from "./components/StatusBar";
 import ConversationPanel from "./components/ConversationPanel";
 import ChatInputBar from "./components/ChatInputBar";
+import PreviewAnalysisPrompt, { type PreviewTrigger } from "./components/PreviewAnalysisPrompt";
+import MarketSummaryModal from "./components/MarketSummaryModal";
+import OtherIndexesPanel from "./components/OtherIndexesPanel";
 
 type Tab = "conversation" | "preview";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("conversation");
   const [marketSummaryOpen, setMarketSummaryOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [previewTrigger, setPreviewTrigger] = useState<PreviewTrigger | null>(null);
+  const [previewCounter, setPreviewCounter] = useState(0);
+  const [indexesOpen, setIndexesOpen] = useState(false);
+
+  function handlePreview(userNotes: string) {
+    setPreviewCounter((n) => n + 1);
+    setPreviewTrigger({ userNotes, id: previewCounter + 1 });
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <StatusBar onOpenMarketSummary={() => setMarketSummaryOpen(true)} />
+      <StatusBar
+        onOpenMarketSummary={() => setMarketSummaryOpen(true)}
+        indexesOpen={indexesOpen}
+        onToggleIndexes={() => setIndexesOpen((v) => !v)}
+      />
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
@@ -44,14 +60,17 @@ export default function App() {
           {/* Active tab content */}
           <div className="flex-1 overflow-y-auto py-4 px-[4%]">
             {activeTab === "conversation" && <ConversationPanel />}
-            {activeTab === "preview" && (
-              <p className="text-gray-500 text-sm">Preview Prompt — Task 54</p>
-            )}
+            {activeTab === "preview" && <PreviewAnalysisPrompt trigger={previewTrigger} />}
           </div>
 
           {/* Chat input bar */}
           <div className="h-24 border-t border-gray-800 py-3 px-[4%] shrink-0">
-            <ChatInputBar />
+            <ChatInputBar
+              message={message}
+              onMessageChange={setMessage}
+              activeTab={activeTab}
+              onPreview={handlePreview}
+            />
           </div>
         </div>
 
@@ -61,28 +80,11 @@ export default function App() {
         </aside>
       </div>
 
-      {/* Market Summary modal placeholder — Task 56 */}
       {marketSummaryOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-40"
-          onClick={() => setMarketSummaryOpen(false)}
-        >
-          <div
-            className="bg-gray-900 border border-gray-700 rounded p-6 w-96"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-gray-400 text-sm">Market Summary — Task 56</p>
-            <button
-              className="mt-4 text-xs text-gray-500 hover:text-gray-300"
-              onClick={() => setMarketSummaryOpen(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
+        <MarketSummaryModal onClose={() => setMarketSummaryOpen(false)} />
       )}
 
-      {/* Other Indexes slide-out — Task 57 */}
+      <OtherIndexesPanel open={indexesOpen} onClose={() => setIndexesOpen(false)} />
     </div>
   );
 }
