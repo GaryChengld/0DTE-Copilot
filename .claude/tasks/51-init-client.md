@@ -14,14 +14,14 @@ placeholder panels.
 │  STATUS BAR (h-10)  · health · AI · ET clock · market hours   [☰]  │
 │                                                             [Task 52]│
 ├──────────────────────────────────────────┬───────────────────────────┤
-│ [ AI Conversation ] [ Preview Prompt ]   │                           │
-│──────────────────────────────────────────│  OPEN POSITIONS           │
-│                                          │  (drill-down list)        │
-│  <active tab content, scrollable>        │                           │
-│                              [Task 53/54]│  NEW TRADE FORM           │
+│ [ AI Conversation ] [ Preview Prompt ]   │ [ Positions ] [ News ]    │
+│──────────────────────────────────────────│───────────────────────────│
 │                                          │                           │
-│                                          │               [Task 55]   │
-├──────────────────────────────────────────┤                           │
+│  <active tab content, scrollable>        │  <active sidebar tab>     │
+│                              [Task 53/54]│  Positions: OpenPositions │
+│                                          │            + TradeEntry   │
+│                                          │  News: NewsPanel [Task 58]│
+├──────────────────────────────────────────┤               [Task 55]   │
 │  CHAT INPUT BAR (h-24)        [Task 53]  │                           │
 └──────────────────────────────────────────┴───────────────────────────┘
                                                ┌──┐
@@ -37,7 +37,7 @@ placeholder panels.
 
 - Main left area has two tabs at the top: "AI Conversation" (Task 53) and "Preview Prompt" (Task 54)
 - Active tab content is scrollable; Chat Input Bar is always visible below the tabs
-- Right sidebar (w-80) is always visible: Open Positions (drill-down) + New Trade Form
+- Right sidebar (w-[25%]) has a tab bar at the top: "Positions" (Task 55) and "News" (Task 58)
 - Market Summary is accessible via the `☰` menu in the status bar (modal, not sidebar)
 - Other Indexes panel is a fixed overlay tab on the right edge, hidden by default
 
@@ -153,9 +153,15 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right sidebar */}
-        <aside className="w-80 border-l border-gray-800 overflow-y-auto flex flex-col gap-4 p-4">
-          <p className="text-gray-500 text-sm">Open Positions + Trade Form — Task 55</p>
+        {/* Right sidebar — tabbed: Positions (Task 55) | News (Task 58) */}
+        <aside className="w-[25%] border-l border-gray-800 flex flex-col">
+          <div className="flex border-b border-gray-800 shrink-0">
+            <button className="px-4 py-2 text-sm text-gray-400">Positions</button>
+            <button className="px-4 py-2 text-sm text-gray-400">News</button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <p className="text-gray-500 text-sm">Sidebar tab content — Tasks 55 / 58</p>
+          </div>
         </aside>
       </div>
 

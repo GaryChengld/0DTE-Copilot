@@ -1,4 +1,4 @@
-# Task 18 — Latest Finance News API
+# Task 18 — Latest Finance News API ✅ COMPLETED
 
 ## Goal
 

@@ -58,6 +58,8 @@ npm run build            # build frontend for production
 
 ## Completed Tasks
 
+### Server
+
 | Task | Description | Date |
 |---|---|---|
 | [01-init-server](.claude/tasks/01-init-server.md) | Scaffold server app, Prisma, health check API | 2026-03-22 |
@@ -77,6 +79,12 @@ npm run build            # build frontend for production
 | [15-get-analysis-message-api](.claude/tasks/15-get-analysis-message-api.md) | POST /api/ai/analyze/message — return analysis payload without sending to AI | 2026-03-28 |
 | [16-market-summary-api](.claude/tasks/16-market-summary-api.md) | POST /api/market-summary — save external market context included in analysis payload | 2026-03-29 |
 | [17-other-indexes-api](.claude/tasks/17-other-indexes-api.md) | POST /api/other_indexes — manually feed intraday VIX/ADD/TICK history included in analysis payload | 2026-03-30 |
+| [18-latest-news-api](.claude/tasks/18-latest-news-api.md) | GET /api/news — latest economic finance headlines from Finnhub | 2026-04-03 |
+
+### Client
+
+| Task | Description | Date |
+|---|---|---|
 | [51-init-client](.claude/tasks/51-init-client.md) | Scaffold React client — Vite + Tailwind dark + socket.io-client + base layout | 2026-03-30 |
 | [52-status-bar](.claude/tasks/52-status-bar.md) | Status bar — server health, AI state, ET clock, market hours, restart button | 2026-03-30 |
 | [53-conversation-panel](.claude/tasks/53-conversation-panel.md) | AI conversation panel + chat/analyze input with Socket.io integration | 2026-04-01 |
@@ -84,6 +92,7 @@ npm run build            # build frontend for production
 | [55-open-positions](.claude/tasks/55-open-positions.md) | Open positions table + exit/delete actions + new trade form | 2026-04-01 |
 | [56-market-summary-input](.claude/tasks/56-market-summary-input.md) | Market summary textarea input | 2026-04-01 |
 | [57-other-indexes-panel](.claude/tasks/57-other-indexes-panel.md) | Other indexes slide-out panel (VIX/ADD/TICK, hideable, clears on save) | 2026-04-01 |
+| [58-news-panel](.claude/tasks/58-news-panel.md) | News panel in right sidebar — economic headlines from Finnhub, tab-switched with Positions | 2026-04-03 |
 
 ## API Reference
 
@@ -101,6 +110,7 @@ npm run build            # build frontend for production
 | POST | `/api/trades/exits` | Exit (partial or full) a trade position |
 | GET | `/api/trades/open` | Retrieve all open trades |
 | DELETE | `/api/trades/:id` | Delete a trade and its exits |
+| GET | `/api/news` | Latest 10 economic finance headlines from Finnhub |
 
 ## Health Check
 
