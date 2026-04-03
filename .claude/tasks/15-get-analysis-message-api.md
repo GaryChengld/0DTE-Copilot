@@ -25,6 +25,7 @@ Request body (optional):
    {
      "timestamp": "2026-03-30 10:15 ET",
      "market_data": { ... },
+     "news": [{ "datetime": "04/03/2026 14:30 ET", "title": "..." }],
      "open_positions": [ ... ],
      "user_notes": "GEX FLIP at 5500, ADD -650, VIX spiking"
    }

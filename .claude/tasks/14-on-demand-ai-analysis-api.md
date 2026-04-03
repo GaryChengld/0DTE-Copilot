@@ -45,14 +45,14 @@ The returned JSON payload sent to AI must follow this schema:
         { "t": "11:05", "o": 5130.5, "h": 5133.0, "l": 5129.2, "c": 5132.1, "v": 19000000 }
       ],
       "daily_stats": {
-        "o": 5110.5, "h": 5130.2, "l": 5105.8, "vwap": 5121.5,
+        "price": 5130.5, "o": 5110.5, "h": 5130.2, "l": 5105.8, "vwap": 5121.5,
         "rsi": 58.4,
         "ma": { "5": 5118.2, "20": 5105.4, "50": 5080.1, "100": 5050.6, "200": 4980.3 }
       }
     },
     "spy": {
       "daily_stats": {
-        "o": 510.2, "h": 512.8, "l": 509.4, "vwap": 511.4,
+        "price": 512.5, "o": 510.2, "h": 512.8, "l": 509.4, "vwap": 511.4,
         "rsi": 57.9,
         "ma": { "5": 511.2, "20": 509.8, "50": 505.2, "100": 501.4, "200": 492.1 }
       }
@@ -61,18 +61,24 @@ The returned JSON payload sent to AI must follow this schema:
       "current": 14.5,
       "history_5m": [14.2, 14.3, 14.5]
     }
-  }
+  },
+  "news": [
+    { "datetime": "04/03/2026 14:30 ET", "title": "Fed signals no rate cuts until inflation falls further" },
+    { "datetime": "04/03/2026 14:15 ET", "title": "Treasury yields climb ahead of jobs data" }
+  ]
 }
 ```
 
 **Indicator computation notes:**
-- `candles_15m`: all RTH 15-min candles from market open (aggregated from 5-min candles), ascending
-- `candles_5m`: latest 6 RTH 5-min candles only (last ~30 minutes of price action)
+- `candles_15m`: all **closed** RTH 15-min candles from market open; only complete groups of 3×5m candles where the last 5m candle is closed are included
+- `candles_5m`: latest 6 **closed** RTH 5-min candles only (last ~30 minutes of confirmed price action); the current open/partial candle is excluded
+- `daily_stats.price`: current market price from `meta.regularMarketPrice` (real-time, not limited to closed candles)
 - `daily_stats.o/h/l`: derived from all today's 5-min candles (open of first candle, running high/low)
 - `daily_stats.vwap`: cumulative VWAP from today's 5-min candles using existing `calculateVwap()`; use SPY volume for SPX
 - `daily_stats.rsi`: 14-period RSI from Yahoo Finance daily quote (no manual calculation needed)
 - `daily_stats.ma`: daily MAs (5/20/50/100/200) from Yahoo Finance daily candle history (no manual calculation needed); `null` if unavailable
 - `vix.history_5m`: list of VIX close values from today's 5-min candles, ascending
+- `news`: latest economic news headlines from Finnhub at the root of the payload (`datetime` = `"MM/DD/YYYY HH:mm ET"` in New York time, `title` only); omitted when `FINNHUB_API_KEY` is not set or fetch fails
 
 ### New: `server/src/routes/analysis.ts`
 

@@ -776,13 +776,13 @@ After one profitable trade (check `open_positions` for completed trades):
 **Win Prob:** xx-xx%
 **Biggest Risk:** (one sentence)
 
-**If Grade C, include adjustment box:**
-┌─ Grade C Adjustments ─────────────────────────────┐
-│ • Profit target: 50% (not 70-90%)                 │
-│ • Stop-loss: 1.5x entry (not 2x)                  │
-│ • This is a compromised strike placement           │
-│ • Consider reducing position size                  │
-└───────────────────────────────────────────────────┘
+**If Grade C, include adjustment note:**
+
+> **⚠️ Grade C Adjustments**
+> - Profit target: 50% (not 70-90%)
+> - Stop-loss: 1.5x entry (not 2x)
+> - This is a compromised strike placement
+> - Consider reducing position size
 
 **Confirm before entering:**
 
@@ -882,3 +882,4 @@ Include for each trade taken:
 - Numbers and strikes: as-is
 - All responses must be formatted in **Markdown**
 - Use headers, tables, bold, bullet lists, and emoji signals (🟢🟡🔴🚨💼📊💰📡⚡📌⚠️⛔)
+- **Never use box-drawing characters** (`┌┐└┘─│├┤┬┴┼` etc.) — they do not align correctly in the display environment. Use blockquotes (`>`), bold, or bullet lists instead.

@@ -16,6 +16,11 @@ function loadSummaryPrompt(): string {
   return readFileSync(join(__dirname, "../prompts/summaryPrompt.md"), "utf-8");
 }
 
+function loadSessionContextPrompt(summary: string): string {
+  const template = readFileSync(join(__dirname, "../prompts/sessionContextPrompt.md"), "utf-8");
+  return template.replace("{{SESSION_SUMMARY}}", summary);
+}
+
 interface AISessionState {
   status: "uninitialized" | "ok" | "error";
   provider: string;
@@ -43,18 +48,19 @@ async function createSession(): Promise<void> {
   sessionState.status = "uninitialized";
   messageCount = 0;
 
-  const initResponse = await provider.init(loadPrompt());
+  const prompt = loadPrompt();
+  const summary = await getTodaySessionSummary();
+  const fullPrompt = summary
+    ? `${prompt}\n\n${loadSessionContextPrompt(summary)}`
+    : prompt;
+
+  if (summary) console.log("[aiSession] injecting today's session summary into system prompt");
+
+  const initResponse = await provider.init(fullPrompt);
   sessionState.status = "ok";
   sessionState.lastMessageAt = new Date().toISOString();
   sessionState.lastError = null;
   if (initResponse) console.log("[AI response]\n", initResponse);
-
-  const summary = await getTodaySessionSummary();
-  if (summary) {
-    console.log("[aiSession] injecting today's session summary as context");
-    const contextResponse = await provider.send(`[SESSION CONTEXT] ${summary}`);
-    if (contextResponse) console.log("[AI response]\n", contextResponse);
-  }
 }
 
 export async function initAISession(): Promise<void> {

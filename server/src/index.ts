@@ -8,6 +8,7 @@ import chatRouter from "./routes/chat.js";
 import analysisRouter, { initAnalysisRouter } from "./routes/analysis.js";
 import marketSummaryRouter from "./routes/marketSummary.js";
 import otherIndexesRouter from "./routes/otherIndexes.js";
+import newsRouter from "./routes/news.js";
 import { sendToAI } from "./services/aiSession.js";
 import { createAiAdvice } from "./db/ingestionRepository.js";
 
@@ -27,6 +28,7 @@ initAnalysisRouter(io);
 app.use("/api", analysisRouter);
 app.use("/api", marketSummaryRouter);
 app.use("/api", otherIndexesRouter);
+app.use("/api", newsRouter);
 
 // Socket.io
 io.on("connection", (socket) => {

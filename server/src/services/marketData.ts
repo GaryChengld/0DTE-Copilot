@@ -48,6 +48,7 @@ export interface Candle5m {
 }
 
 export interface DailyStats {
+  price: number;
   o: number;
   h: number;
   l: number;
@@ -104,6 +105,24 @@ function formatTimeET(date: Date): string {
   const hour = parts.find((p) => p.type === "hour")!.value;
   const minute = parts.find((p) => p.type === "minute")!.value;
   return `${hour}:${minute}`;
+}
+
+// Snap a timestamp to the 15-minute boundary in ET (e.g. 09:35 → "09:30")
+function snap15mET(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const hour = parts.find((p) => p.type === "hour")!.value;
+  const minute = parseInt(parts.find((p) => p.type === "minute")!.value);
+  return `${hour}:${String(Math.floor(minute / 15) * 15).padStart(2, "0")}`;
+}
+
+// A 5m candle is closed when its start time + 5 minutes is in the past
+function isCandleClosed(candleDate: Date): boolean {
+  return candleDate.getTime() + 5 * 60 * 1000 <= Date.now();
 }
 
 function calcVwap(candles: RTHCandle[]): number | null {
@@ -192,9 +211,10 @@ export async function fetchMarketData(): Promise<MarketData> {
     const result: Candle5m[] = [];
     for (let i = 0; i < candles.length; i += 3) {
       const group = candles.slice(i, i + 3);
-      if (group.length === 0) break;
+      // Only include complete groups of 3 where the last candle is closed
+      if (group.length < 3 || !isCandleClosed(group[2].date)) break;
       result.push({
-        t: formatTimeET(group[0].date),
+        t: snap15mET(group[0].date),
         o: r2(group[0].open),
         h: r2(Math.max(...group.map((c) => c.high))),
         l: r2(Math.min(...group.map((c) => c.low))),
@@ -213,6 +233,7 @@ export async function fetchMarketData(): Promise<MarketData> {
   ): DailyStats => {
     const hasCandles = candles.length > 0;
     return {
+      price: r2(meta.regularMarketPrice ?? (hasCandles ? candles[candles.length - 1].close : 0)),
       o: r2(hasCandles ? candles[0].open : (meta.regularMarketOpen ?? 0)),
       h: r2(hasCandles ? Math.max(...candles.map((c) => c.high)) : (meta.regularMarketDayHigh ?? 0)),
       l: r2(hasCandles ? Math.min(...candles.map((c) => c.low)) : (meta.regularMarketDayLow ?? 0)),
@@ -234,10 +255,12 @@ export async function fetchMarketData(): Promise<MarketData> {
     return { ...spxCandle, volume: spyCandle?.volume ?? 0 };
   });
 
+  const spxClosedCandles = spxResult.candles.filter((c) => isCandleClosed(c.date));
+
   return {
     spx: {
-      candles_15m: buildCandles15m(spxResult.candles),
-      candles_5m: spxResult.candles.slice(-6).map(toCandle5m),
+      candles_15m: buildCandles15m(spxClosedCandles),
+      candles_5m: spxClosedCandles.slice(-6).map(toCandle5m),
       daily_stats: buildDailyStats(spxResult.candles, spxWithSpyVolume, spxDailyCloses, spxResult.meta),
     },
     spy: {

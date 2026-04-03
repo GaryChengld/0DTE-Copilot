@@ -4,6 +4,15 @@ import remarkGfm from "remark-gfm";
 import { getAiAdvices } from "../api/chat";
 import { useSocket } from "../hooks/useSocket";
 
+
+// Ensure lines starting with a bold label (**text:**) are separated by blank lines
+// so Markdown renders them as distinct paragraphs instead of collapsing them.
+function ensureParagraphBreaks(text: string): string {
+  // Matches lines starting with a bold label where the colon is inside (**关键点:**)
+  // or outside (**关键点**:) the bold markers.
+  return text.replace(/\n(\*\*[^*\n]+[：:]\*\*|\*\*[^*\n]+\*\*[：:])/g, "  \n$1");
+}
+
 interface Message {
   key: string;
   source: string;
@@ -129,7 +138,7 @@ export default function ConversationPanel() {
             <span className="text-xs ml-auto" style={{ color: "var(--text-muted)" }}>{msg.displayTime}</span>
           </div>
           <div className="prose prose-invert max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.response}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{ensureParagraphBreaks(msg.response)}</ReactMarkdown>
           </div>
         </div>
       ))}

@@ -5,6 +5,7 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL ?? "file:./dev.db",
   promptFile: process.env.PROMPT_FILE ?? "strategicPrompt.md",
   sessionSummaryInterval: parseInt(process.env.SESSION_SUMMARY_INTERVAL ?? "20", 10),
+  finnhubApiKey: process.env.FINNHUB_API_KEY ?? "",
   llm: {
     provider: process.env.LLM_PROVIDER ?? "gemini",
     gemini: {

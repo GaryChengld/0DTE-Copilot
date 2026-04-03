@@ -280,3 +280,4 @@ Market summary, regime, trades taken/rejected, key decisions, lessons, premium o
 - Technical terms, signals, alert labels: English
 - Numbers/strikes: as-is
 - Markdown with tables, bold, emoji (🟢🟡🔴🚨💼📊💰📡⚡📌⚠️⛔)
+- **Never use box-drawing characters** (`┌┐└┘─│├┤┬┴┼` etc.) — they do not align correctly in the display environment. Use blockquotes (`>`), bold, or bullet lists instead.

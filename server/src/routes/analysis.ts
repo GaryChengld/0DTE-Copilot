@@ -6,6 +6,7 @@ import { createAiAdvice } from '../db/ingestionRepository.js'
 import { findOpenTrades } from '../db/tradeRepository.js'
 import { getLatestMarketSummary } from '../db/marketSummaryRepository.js'
 import { getTodayOtherIndexSnapshots } from '../db/otherIndexesRepository.js'
+import { fetchLatestNews } from '../services/news.js'
 import { config } from '../config.js'
 
 const router = Router()
@@ -21,11 +22,12 @@ function getTradeDateET(): string {
 
 async function buildAnalysisPayload(userNotes?: string) {
   const tradeDate = getTradeDateET()
-  const [marketData, openTrades, marketSummary, otherIndexSnapshots] = await Promise.all([
+  const [marketData, openTrades, marketSummary, otherIndexSnapshots, newsItems] = await Promise.all([
     fetchMarketData(),
     findOpenTrades(),
     getLatestMarketSummary(),
     getTodayOtherIndexSnapshots(tradeDate),
+    config.finnhubApiKey ? fetchLatestNews(10).catch(() => []) : Promise.resolve([]),
   ])
   const marketDataPayload: Record<string, unknown> = { ...marketData }
   if (otherIndexSnapshots.length > 0) {
@@ -53,6 +55,9 @@ async function buildAnalysisPayload(userNotes?: string) {
     timestamp,
     market_data: marketDataPayload,
     open_positions: openTrades,
+  }
+  if (newsItems.length > 0) {
+    payload.news = newsItems.map((n) => ({ datetime: n.publishedAt, title: n.title }))
   }
   if (marketSummary) payload.market_summary = marketSummary
   if (userNotes) payload.user_notes = userNotes

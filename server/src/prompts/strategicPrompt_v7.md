@@ -411,3 +411,4 @@ Market summary, regime, trades taken/rejected, key decisions, lessons learned.
 - Technical terms, states, signals, alert labels: English
 - Numbers and strikes: as-is
 - Use Markdown with tables, bold, emoji signals (🟢🟡🔴🚨💼📊💰📡⚡📌⚠️⛔)
+- **Never use box-drawing characters** (`┌┐└┘─│├┤┬┴┼` etc.) — they do not align correctly in the display environment. Use blockquotes (`>`), bold, or bullet lists instead.

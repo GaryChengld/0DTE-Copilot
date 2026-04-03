@@ -1,5 +1,5 @@
 [SESSION SUMMARY REQUEST] Summarize today's trading session context in compact JSON.
-Return ONLY raw JSON. Exclude open positions.
+Return ONLY raw JSON. Exclude open positions. All string values must be in English.
 
 ```json
 {
@@ -20,6 +20,12 @@ Return ONLY raw JSON. Exclude open positions.
     "trend": "Crushing | Rising | Stable",
     "relative_to_iv": "..."
   },
+  "add_dynamics": {
+    "opening_add": 0,
+    "current_add": 0,
+    "trend": "Improving | Deteriorating | Stable",
+    "breadth_signal": "Bullish | Bearish | Neutral"
+  },
   "key_levels": {
     "nearest_resistance": 5130.0,
     "nearest_support": 5115.0,
@@ -32,6 +38,7 @@ Return ONLY raw JSON. Exclude open positions.
     "ma_context": "Testing 200MA"
   },
   "sentiment_signals": { "tick_breadth": "...", "internals": "..." },
+  "key_news": ["Fed holds rates steady", "CPI in line with expectations"],
   "setups_considered": ["Bull Put Spread"],
   "notes": "Price is approaching the 5130 Resistance/Call Wall; watch for rejection."
 }

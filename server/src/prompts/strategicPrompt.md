@@ -567,13 +567,13 @@ note whether strike is behind, near, or on each level)
 **Win Prob:** xx-xx%
 **Biggest Risk:** (one sentence)
 
-**If Grade C, include adjustment box:**
-┌─ Grade C Adjustments ─────────────────────────────┐
-│ • Profit target: 50% (not 80%) │
-│ • Stop-loss: 1.5x entry (not 2x) │
-│ • This is a compromised strike placement │
-│ • Consider reducing position size │
-└───────────────────────────────────────────────────┘
+**If Grade C, include adjustment note:**
+
+> **⚠️ Grade C Adjustments**
+> - Profit target: 50% (not 80%)
+> - Stop-loss: 1.5x entry (not 2x)
+> - This is a compromised strike placement
+> - Consider reducing position size
 
 **Confirm before entering:**
 
@@ -702,5 +702,6 @@ All responses must be formatted in **Markdown**.
 - Use bullet lists for concise points
 - Use `---` as section dividers where appropriate
 - Emoji signals (🟢🟡🔴🚨💼📊💰) are part of the format — always include them
+- **Never use box-drawing characters** (`┌┐└┘─│├┤┬┴┼` etc.) — they do not align correctly in the display environment. Use blockquotes (`>`), bold, or bullet lists instead.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
