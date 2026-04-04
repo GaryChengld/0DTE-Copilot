@@ -28,7 +28,8 @@
       "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=I_AM_SURE npx prisma migrate dev --name replace_strikes_with_strike)",
       "Bash(npm list:*)",
       "Bash(npm create:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(venv/Scripts/python.exe -c \"from tvDatafeed import Interval; print\\([i.name for i in Interval]\\)\")"
     ]
   }
 }

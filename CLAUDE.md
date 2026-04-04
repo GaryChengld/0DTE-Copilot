@@ -28,6 +28,11 @@ client/    # React frontend — single-page trading dashboard
     main.tsx          # Vite entry point
   vite.config.ts      # Vite + Tailwind + proxy to backend
 
+tools/     # Standalone Python utilities
+  tv_feed.py          # Polls TradingView for VIX/$ADD/$TICK → POST /api/other_indexes
+  requirements.txt    # Python dependencies
+  README.md           # Setup and usage instructions
+
 server/    # Express backend — market data, AI session, Socket.io
   src/
     index.ts          # Entry point: Express + Socket.io server
@@ -94,6 +99,12 @@ npm run build            # build frontend for production
 | [57-other-indexes-panel](.claude/tasks/57-other-indexes-panel.md) | Other indexes slide-out panel (VIX/ADD/TICK, hideable, clears on save) | 2026-04-01 |
 | [58-news-panel](.claude/tasks/58-news-panel.md) | News panel in right sidebar — economic headlines from Finnhub, tab-switched with Positions | 2026-04-03 |
 
+### Tools
+
+| Task | Description | Date |
+|---|---|---|
+| [t01-tv-internals-feeder](.claude/tasks/tools/t01-tv-internals-feeder.md) | Python script — polls TradingView for VIX/$ADD/$TICK and feeds to server | 2026-04-03 |
+
 ## API Reference
 
 | Method | Endpoint | Description |
@@ -124,7 +135,7 @@ npm run build            # build frontend for production
 ### Core Trading Logic (hierarchical, order matters)
 
 1. **VWAP (The Anchor):** Cumulative from 09:30 AM ET. Price above/below VWAP = primary Bullish/Bearish bias.
-2. **Market Internals:** $ADD (breadth) and $TICK (NYSE tick) confirm or contradict the VWAP bias — fed manually via `POST /api/other_indexes`.
+2. **Market Internals:** $ADD (breadth) and $TICK (NYSE tick) confirm or contradict the VWAP bias — fed via `POST /api/other_indexes` (manually from the UI or automatically via `tools/tv_feed.py`).
 3. **Gamma Map:** User-supplied GEX levels (Call Wall, GEX Flip, Put Wall) stored via `/api/market-summary` identify reversal/breakout zones.
 4. **AI Copilot:** Persistent LLM session (lazy-initialized on first use), triggered on-demand. Operates in two modes:
    - **Observation Mode** — scanning for high-probability entry setups
@@ -141,6 +152,8 @@ npm run build            # build frontend for production
 | `db/otherIndexesRepository.ts` | Upserts and retrieves today's intraday VIX/ADD/TICK snapshots by `tradeDate` + `time` |
 | `utils/marketHours.ts` | Helper to check if current time is within RTH (Mon–Fri 09:30–16:00 ET) |
 | Socket.io layer | Broadcasts AI responses to frontend via `chat:response` event |
+| `services/news.ts` | Fetches latest economic headlines from Finnhub API; keyword-filters for macro relevance |
+| `tools/tv_feed.py` | Python polling script — fetches VIX/$ADD/$TICK from TradingView and POSTs to `/api/other_indexes` |
 
 ### Analysis Payload
 
