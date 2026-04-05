@@ -1,4 +1,5 @@
 tvdatafeed==2.1.0
 pandas
+pandas-ta
 python-dotenv
 requests

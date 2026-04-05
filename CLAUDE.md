@@ -30,6 +30,7 @@ client/    # React frontend — single-page trading dashboard
 
 tools/     # Standalone Python utilities
   tv_feed.py          # Polls TradingView for VIX/$ADD/$TICK → POST /api/other_indexes
+  tv_export.py        # Exports historical OHLCV + indicators (RSI/SMA/EMA/ATR/MACD) to CSV
   requirements.txt    # Python dependencies
   README.md           # Setup and usage instructions
 
@@ -104,6 +105,7 @@ npm run build            # build frontend for production
 | Task | Description | Date |
 |---|---|---|
 | [t01-tv-internals-feeder](.claude/tasks/tools/t01-tv-internals-feeder.md) | Python script — polls TradingView for VIX/$ADD/$TICK and feeds to server | 2026-04-03 |
+| [t02-tv-history-exporter](.claude/tasks/tools/t02-tv-history-exporter.md) | Python script — exports historical OHLCV + indicators from TradingView to CSV | 2026-04-04 |
 
 ## API Reference
 
@@ -154,6 +156,7 @@ npm run build            # build frontend for production
 | Socket.io layer | Broadcasts AI responses to frontend via `chat:response` event |
 | `services/news.ts` | Fetches latest economic headlines from Finnhub API; keyword-filters for macro relevance |
 | `tools/tv_feed.py` | Python polling script — fetches VIX/$ADD/$TICK from TradingView and POSTs to `/api/other_indexes` |
+| `tools/tv_export.py` | Python export script — downloads historical OHLCV candles from TradingView and computes RSI/SMA/EMA/ATR/MACD indicators into a CSV |
 
 ### Analysis Payload
 

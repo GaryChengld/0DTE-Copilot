@@ -82,11 +82,11 @@ Press `Ctrl+C` to stop the feeder.
 | `--interval` | Description |
 |---|---|
 | `1` | Every 1 minute |
-| `2` | Every 2 minutes |
 | `3` | Every 3 minutes |
 | `5` | Every 5 minutes (default) |
 | `15` | Every 15 minutes |
 | `30` | Every 30 minutes |
+| `45` | Every 45 minutes |
 
 ### Troubleshooting
 
@@ -96,3 +96,54 @@ Press `Ctrl+C` to stop the feeder.
 | `WARNING: failed to fetch add` | $ADD may be temporarily unavailable on TradingView — script continues |
 | `WARNING: HTTP error posting to server` | Make sure the copilot server is running on the configured `SERVER_URL` |
 | `ModuleNotFoundError` | Run `pip install -r requirements.txt` with the virtual environment active |
+
+---
+
+## tv_export.py — TradingView History Exporter
+
+Exports historical OHLCV candle data from TradingView to a CSV file in `tools/data/`.
+Used for building datasets for backtesting.
+
+> **Setup:** Uses the same `venv` and `.env` as `tv_feed.py` — no additional setup needed.
+
+### Usage
+
+```bash
+# Activate the virtual environment first (if not already active)
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS / Linux
+
+# Export 20000 bars of SPX 5-minute candles
+python tv_export.py --symbol SPX --exchange INDEX --timeframe 5 --bars 20000 --out spx_5m.csv
+
+# Export 300 days of SPY daily candles
+python tv_export.py --symbol SPY --exchange AMEX --timeframe 1d --bars 300 --out spy_daily.csv
+```
+
+Output is saved to `tools/data/<filename>`. The `data/` folder is gitignored.
+
+### Parameters
+
+| Argument | Description |
+|---|---|
+| `--symbol` | Ticker symbol, e.g. `SPX`, `SPY`, `QQQ` |
+| `--exchange` | Exchange, e.g. `INDEX`, `AMEX`, `NASDAQ`, `USI` |
+| `--timeframe` | `1` `3` `5` `15` `30` `45` `1h` `2h` `4h` `1d` `1w` |
+| `--bars` | Number of candles to fetch |
+| `--out` | Output filename (saved under `tools/data/`) |
+
+### Output CSV Format
+
+```
+datetime,open,high,low,close,volume
+2025-10-01 09:30:00,5120.10,5128.00,5118.20,5125.80,121000
+2025-10-01 09:35:00,5125.80,5132.40,5123.10,5130.20,98000
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `ERROR: no data returned` | Check `--symbol` and `--exchange` are correct for TradingView |
+| `ERROR: unsupported timeframe` | Use one of: `1` `3` `5` `15` `30` `45` `1h` `2h` `4h` `1d` `1w` |
+| `TV_USERNAME and TV_PASSWORD must be set` | Check your `.env` file exists and has correct values |

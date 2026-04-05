@@ -140,5 +140,6 @@ vite.config.ts.timestamp-*
 
 # Python tools
 tools/venv/
+tools/data/
 tools/__pycache__/
 *.pyc

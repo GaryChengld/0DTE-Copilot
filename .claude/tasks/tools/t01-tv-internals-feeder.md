@@ -47,8 +47,8 @@ if `TV_USERNAME` or `TV_PASSWORD` are missing.
 | Metric | Symbol | Exchange |
 |---|---|---|
 | VIX | `VIX` | `CBOE` |
-| $ADD | `ADD` | `NYSE` |
-| $TICK | `TICK` | `NYSE` |
+| $ADD | `ADD` | `USI` |
+| $TICK | `TICK` | `USI` |
 
 Fetched using `tvdatafeed.get_hist(symbol, exchange, interval, n_bars=2)`.
 Use the close of index `-2` (last **closed** candle) to avoid partial/open candle values.

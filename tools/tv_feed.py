@@ -41,8 +41,8 @@ INTERVAL_MAP = {
 
 SYMBOLS = [
     ("vix",  "VIX",  "CBOE"),
-    ("add",  "ADD",  "NYSE"),
-    ("tick", "TICK", "NYSE"),
+    ("add",  "ADD",  "USI"),
+    ("tick", "TICK", "USI"),
 ]
 
 ET = ZoneInfo("America/New_York")
