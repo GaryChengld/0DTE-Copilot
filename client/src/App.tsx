@@ -7,6 +7,7 @@ import MarketSummaryModal from "./components/MarketSummaryModal";
 import OtherIndexesPanel from "./components/OtherIndexesPanel";
 import OpenPositions from "./components/OpenPositions";
 import NewsPanel from "./components/NewsPanel";
+import MarketDataPanel from "./components/MarketDataPanel";
 import { getNews, type NewsItem } from "./api/news";
 
 type Tab = "conversation" | "preview";
@@ -54,7 +55,10 @@ export default function App() {
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: tabbed panel + chat input */}
+        {/* Left: Market Data panel */}
+        <MarketDataPanel />
+
+        {/* Middle: tabbed panel + chat input */}
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Tab bar */}
           <div className="flex border-b shrink-0" style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}>
@@ -100,7 +104,7 @@ export default function App() {
         </div>
 
         {/* Right sidebar */}
-        <aside className="w-[25%] flex flex-col shrink-0" style={{ background: "var(--bg-panel)", borderLeft: "1px solid var(--border)" }}>
+        <aside className="w-[20%] flex flex-col shrink-0" style={{ background: "var(--bg-panel)", borderLeft: "1px solid var(--border)" }}>
           {/* Sidebar tab bar */}
           <div className="flex shrink-0" style={{ borderBottom: "1px solid var(--border)" }}>
             {(["positions", "news"] as SidebarTab[]).map((tab) => (

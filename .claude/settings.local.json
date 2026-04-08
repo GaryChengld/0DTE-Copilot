@@ -29,7 +29,8 @@
       "Bash(npm list:*)",
       "Bash(npm create:*)",
       "Bash(node -e \":*)",
-      "Bash(venv/Scripts/python.exe -c \"from tvDatafeed import Interval; print\\([i.name for i in Interval]\\)\")"
+      "Bash(venv/Scripts/python.exe -c \"from tvDatafeed import Interval; print\\([i.name for i in Interval]\\)\")",
+      "Bash(npx tsc:*)"
     ]
   }
 }

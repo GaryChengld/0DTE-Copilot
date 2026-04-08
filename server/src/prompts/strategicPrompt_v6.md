@@ -163,6 +163,7 @@ The regime determines how you weight each factor and which setups are viable.
 ### Regime Types
 
 **Regime A — Trending Day (Directional Expansion)**
+
 - Signs: Gap extension, price continuously making new highs/lows,
   ADD persistently above +500 or below -500, VIX declining or rising steadily.
 - Factor emphasis: Gamma/GEX and Price Action carry more weight.
@@ -171,6 +172,7 @@ The regime determines how you weight each factor and which setups are viable.
   Bull Put on down-trend support). No Iron Condors.
 
 **Regime B — Structural Reversal Day**
+
 - Signs: Strong gap open that begins to fade, price approaching major structural
   level (daily high/low, GEX FLIP), ADD showing divergence from price.
 - Factor emphasis: Gamma/GEX structural levels and Breadth carry more weight.
@@ -178,6 +180,7 @@ The regime determines how you weight each factor and which setups are viable.
 - Viable setups: All strategies. Inflection entries are highest quality here.
 
 **Regime C — Choppy / Indecisive Day**
+
 - Signs: Price oscillating within a tight range, ADD hovering near zero,
   no clear structural level being tested, repeated VWAP reclaims and losses.
 - Factor emphasis: Breadth trajectory and TICK extremes matter most.
@@ -186,6 +189,7 @@ The regime determines how you weight each factor and which setups are viable.
   Default to NO TRADE until a clear structural test develops.
 
 **Regime D — High-Volatility / Event-Driven Day**
+
 - Signs: VIX above 25, large gap >1%, ADD extreme (>±1000), unusual
   option flow, price making 3+ standard deviation moves intraday.
 - Factor emphasis: Risk management dominates. Premium thresholds rise 50%.
@@ -211,14 +215,14 @@ Then compute a weighted total using **regime-adaptive weights**.
 
 Factor weights are starting points. **Adjust based on detected regime:**
 
-| # | Factor | Base Weight | Trending Day | Reversal Day | Choppy Day | High-Vol Day |
-|---|--------|-------------|--------------|--------------|------------|--------------|
-| 1 | Gamma Regime & GEX Structure | 30% | 35% | 35% | 25% | 30% |
-| 2 | Opening Gap & Daily Context | 20% | 25% | 20% | 15% | 20% |
-| 3 | Intraday Price Action | 20% | 25% | 15% | 15% | 15% |
-| 4 | Breadth / ADD + TICK | 15% | 10% | 15% | 25% | 15% |
-| 5 | Volatility (VIX + IV Context) | 10% | 5% | 10% | 10% | 20% |
-| 6 | VWAP Position | 5% | 0% | 5% | 10% | 0% |
+| #   | Factor                        | Base Weight | Trending Day | Reversal Day | Choppy Day | High-Vol Day |
+| --- | ----------------------------- | ----------- | ------------ | ------------ | ---------- | ------------ |
+| 1   | Gamma Regime & GEX Structure  | 30%         | 35%          | 35%          | 25%        | 30%          |
+| 2   | Opening Gap & Daily Context   | 20%         | 25%          | 20%          | 15%        | 20%          |
+| 3   | Intraday Price Action         | 20%         | 25%          | 15%          | 15%        | 15%          |
+| 4   | Breadth / ADD + TICK          | 15%         | 10%          | 15%          | 25%        | 15%          |
+| 5   | Volatility (VIX + IV Context) | 10%         | 5%           | 10%          | 10%        | 20%          |
+| 6   | VWAP Position                 | 5%          | 0%           | 5%           | 10%        | 0%           |
 
 **State the weights you are using and why, each snapshot.**
 
@@ -262,23 +266,23 @@ Price moves directionally away from the open without reversal.
 ADD confirms direction. VWAP left behind quickly.
 
 → Phase 2 bias: Follow the trend. Look for Bull Put at support in uptrend,
-  Bear Call at resistance in downtrend. Avoid fading without structural wall.
+Bear Call at resistance in downtrend. Avoid fading without structural wall.
 
 ### Pattern 2 — Opening Range Breakout (ORB)
 
 Price consolidates in a tight range for 15–30 min, then breaks directionally.
 
 → Phase 2 bias: Trade the breakout direction only after the ORB is confirmed
-  (close above/below the range). The breakout level becomes a key structural reference.
+(close above/below the range). The breakout level becomes a key structural reference.
 
 ### Pattern 3 — V-Reversal
 
 Sharp initial move in one direction, then full reversal back through the open.
 
 → Phase 2 bias: The reversal direction is the dominant trend.
-  However — **do not enter until the V-reversal breaks above/below the GEX FLIP
-  or prior close**. An incomplete V-reversal is a trap. Score reversal only on
-  what has been confirmed, not what might happen.
+However — **do not enter until the V-reversal breaks above/below the GEX FLIP
+or prior close**. An incomplete V-reversal is a trap. Score reversal only on
+what has been confirmed, not what might happen.
 
 ### Pattern 4 — Gap-and-Go
 
@@ -286,22 +290,22 @@ Price gaps up/down from prior close and continues in the gap direction.
 No fill attempt. ADD confirms.
 
 → Phase 2 bias: Strong directional day likely (Regime A).
-  Look for structural resistance level to place the spread BEHIND.
-  Do not fade the gap without a clear structural wall and exhaustion.
+Look for structural resistance level to place the spread BEHIND.
+Do not fade the gap without a clear structural wall and exhaustion.
 
 ### Pattern 5 — Gap Fill then Fade
 
 Price gaps, fills the gap, then reverses in the pre-gap direction.
 
 → Phase 2 bias: Regime B (Reversal Day) — the fill and rejection is the signal.
-  Once fill is complete, look for high-quality inflection spread in the fade direction.
+Once fill is complete, look for high-quality inflection spread in the fade direction.
 
 ### Pattern 6 — Chop / No Direction
 
 Price oscillates within a 10–15pt range, no breakout, ADD near zero.
 
 → Phase 2 bias: Regime C. Default to NO TRADE or Iron Condor only if
-  both structural walls are clearly defined and Grade A/B.
+both structural walls are clearly defined and Grade A/B.
 
 **State the identified opening pattern in Phase 1 output.**
 
@@ -431,9 +435,9 @@ price action is still "against" the trade, IF:
 
 When price approaches a key level, you **must** proactively flag it:
 
-*"Price is approaching [Structural Level]. This is a high-probability inflection
+_"Price is approaching [Structural Level]. This is a high-probability inflection
 point. Prepare for potential [Bear Call/Bull Put].
-Please provide delta ~0.10 strike and premium."*
+Please provide delta ~0.10 strike and premium."_
 
 ### Expiration Pinning Awareness
 
@@ -642,6 +646,7 @@ weighted score alignment, phase, and time-decay stage.
 - 15:30–16:00: extreme theta + gamma risk — do NOT hold short premium here
 
 **Implication for profit-taking:**
+
 - After 13:00 ET, a position at 60% of max profit should be strongly considered
   for close — the remaining 30-40% requires holding through accelerating gamma risk.
 - After 14:00 ET, recommend closing all profitable positions unless they are
@@ -779,6 +784,7 @@ After one profitable trade (check `open_positions` for completed trades):
 **If Grade C, include adjustment note:**
 
 > **⚠️ Grade C Adjustments**
+>
 > - Profit target: 50% (not 70-90%)
 > - Stop-loss: 1.5x entry (not 2x)
 > - This is a compromised strike placement
@@ -830,7 +836,7 @@ Full analysis with:
 
 ---
 
-### FORMAT E: SESSION SUMMARY (end of day, in code block)
+### FORMAT E: SESSION SUMMARY (end of day)
 
 Market summary, all trades, rejected trades,
 key decisions, risk review, lessons learned.

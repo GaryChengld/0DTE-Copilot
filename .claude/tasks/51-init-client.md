@@ -10,35 +10,33 @@ placeholder panels.
 ## Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  STATUS BAR (h-10)  · health · AI · ET clock · market hours   [☰]  │
-│                                                             [Task 52]│
-├──────────────────────────────────────────┬───────────────────────────┤
-│ [ AI Conversation ] [ Preview Prompt ]   │ [ Positions ] [ News ]    │
-│──────────────────────────────────────────│───────────────────────────│
-│                                          │                           │
-│  <active tab content, scrollable>        │  <active sidebar tab>     │
-│                              [Task 53/54]│  Positions: OpenPositions │
-│                                          │            + TradeEntry   │
-│                                          │  News: NewsPanel [Task 58]│
-├──────────────────────────────────────────┤               [Task 55]   │
-│  CHAT INPUT BAR (h-24)        [Task 53]  │                           │
-└──────────────────────────────────────────┴───────────────────────────┘
-                                               ┌──┐
-                                               │  │ ← Other Indexes
-                                               │  │   slide-out tab
-                                               │  │   (fixed, right edge)
-                                               └──┘   [Task 57]
+┌────────────────────────────────────────────────────────────────────────────┐
+│  STATUS BAR (h-10)  · health · AI · ET clock · market hours          [☰]  │
+│                                                                   [Task 52]│
+├──────────────────┬───────────────────────────────┬────────────────────────┤
+│                  │ [ AI Conversation ] [ Preview ]│ [ Positions ] [ News ] │
+│  MARKET DATA     │───────────────────────────────│────────────────────────│
+│  PANEL           │                               │                        │
+│  (TradingView +  │  <active tab content>         │  <active sidebar tab>  │
+│   future items)  │                   [Task 53/54]│  Positions [Task 55]   │
+│                  │                               │  News      [Task 58]   │
+│                  ├───────────────────────────────┤                        │
+│                  │  CHAT INPUT BAR    [Task 53]  │                        │
+└──────────────────┴───────────────────────────────┴────────────────────────┘
+                                                        ┌──┐
+                                                        │  │ ← Other Indexes
+                                                        │  │   slide-out
+                                                        └──┘   [Task 57]
 
 ☰ Menu (Task 52):
   · Restart AI Session
   · Market Summary [Task 56]  ← opens modal overlay
 ```
 
-- Main left area has two tabs at the top: "AI Conversation" (Task 53) and "Preview Prompt" (Task 54)
-- Active tab content is scrollable; Chat Input Bar is always visible below the tabs
-- Right sidebar (w-[25%]) has a tab bar at the top: "Positions" (Task 55) and "News" (Task 58)
-- Market Summary is accessible via the `☰` menu in the status bar (modal, not sidebar)
+- **Left panel** (w-[20%]): Market Data panel — TradingView chart (h-[50%]) + future market data sections (Task 59)
+- **Middle area** (w-[60%], flex-1): two tabs — "AI Conversation" (Task 53) and "Preview Prompt" (Task 54); Chat Input Bar always visible below
+- **Right sidebar** (w-[20%]): tab bar — "Positions" (Task 55) and "News" (Task 58)
+- Market Summary accessible via `☰` menu in status bar (modal overlay)
 - Other Indexes panel is a fixed overlay tab on the right edge, hidden by default
 
 ## Changes

@@ -9,6 +9,7 @@ import analysisRouter, { initAnalysisRouter } from "./routes/analysis.js";
 import marketSummaryRouter from "./routes/marketSummary.js";
 import otherIndexesRouter from "./routes/otherIndexes.js";
 import newsRouter from "./routes/news.js";
+import marketSnapshotRouter from "./routes/marketSnapshot.js";
 import { sendToAI } from "./services/aiSession.js";
 import { createAiAdvice } from "./db/ingestionRepository.js";
 
@@ -29,6 +30,7 @@ app.use("/api", analysisRouter);
 app.use("/api", marketSummaryRouter);
 app.use("/api", otherIndexesRouter);
 app.use("/api", newsRouter);
+app.use("/api", marketSnapshotRouter);
 
 // Socket.io
 io.on("connection", (socket) => {

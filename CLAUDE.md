@@ -86,6 +86,7 @@ npm run build            # build frontend for production
 | [16-market-summary-api](.claude/tasks/16-market-summary-api.md) | POST /api/market-summary — save external market context included in analysis payload | 2026-03-29 |
 | [17-other-indexes-api](.claude/tasks/17-other-indexes-api.md) | POST /api/other_indexes — manually feed intraday VIX/ADD/TICK history included in analysis payload | 2026-03-30 |
 | [18-latest-news-api](.claude/tasks/18-latest-news-api.md) | GET /api/news — latest economic finance headlines from Finnhub | 2026-04-03 |
+| [19-spx-daily-api](.claude/tasks/19-spx-daily-api.md) | GET /api/market-snapshot — SPX daily snapshot + latest VIX/ADD/TICK | — |
 
 ### Client
 
@@ -99,6 +100,8 @@ npm run build            # build frontend for production
 | [56-market-summary-input](.claude/tasks/56-market-summary-input.md) | Market summary textarea input | 2026-04-01 |
 | [57-other-indexes-panel](.claude/tasks/57-other-indexes-panel.md) | Other indexes slide-out panel (VIX/ADD/TICK, hideable, clears on save) | 2026-04-01 |
 | [58-news-panel](.claude/tasks/58-news-panel.md) | News panel in right sidebar — economic headlines from Finnhub, tab-switched with Positions | 2026-04-03 |
+| [59-tradingview-chart](.claude/tasks/59-tradingview-chart.md) | Market Data panel (left panel) — TradingView embedded SPX chart, extensible for future market data | — |
+| [60-market-snapshot-display](.claude/tasks/60-market-snapshot-display.md) | SPX summary + VIX/ADD/TICK ticker above chart in Market Data panel | — |
 
 ### Tools
 

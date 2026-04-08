@@ -20,6 +20,7 @@ type YFMeta = {
   regularMarketDayHigh?: number;
   regularMarketDayLow?: number;
   regularMarketVolume?: number;
+  chartPreviousClose?: number;
 };
 
 type YFChartResult = {
@@ -184,6 +185,34 @@ async function fetchDailyCloses(symbol: string, days: number): Promise<number[]>
   })) as unknown as YFChartResult;
 
   return (result.quotes ?? []).filter((q) => q.close != null).map((q) => q.close!);
+}
+
+// --- SPX daily snapshot (lightweight) ---
+
+export interface SpxDailySnapshot {
+  price: number;
+  o: number;
+  h: number;
+  l: number;
+  change: number;
+  changePct: number;
+}
+
+export async function fetchSpxDailySnapshot(): Promise<SpxDailySnapshot> {
+  const { candles, meta } = await fetchTodayRTHCandles("^GSPC");
+
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const hasCandles = candles.length > 0;
+
+  const price = r2(meta.regularMarketPrice ?? (hasCandles ? candles[candles.length - 1].close : 0));
+  const o = r2(hasCandles ? candles[0].open : (meta.regularMarketOpen ?? 0));
+  const h = r2(hasCandles ? Math.max(...candles.map((c) => c.high)) : (meta.regularMarketDayHigh ?? 0));
+  const l = r2(hasCandles ? Math.min(...candles.map((c) => c.low)) : (meta.regularMarketDayLow ?? 0));
+  const prevClose = meta.chartPreviousClose ?? o;
+  const change = r2(price - prevClose);
+  const changePct = prevClose !== 0 ? r2((change / prevClose) * 100) : 0;
+
+  return { price, o, h, l, change, changePct };
 }
 
 // --- Main export ---

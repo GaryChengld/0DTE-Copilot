@@ -3,10 +3,17 @@ TradingView History Exporter
 Exports historical OHLCV candle data from TradingView to a CSV file.
 
 Usage:
+    # No indicators
     python tv_export.py --symbol SPX --exchange INDEX --timeframe 5 --bars 20000 --out spx_5m.csv
-    python tv_export.py --symbol SPY --exchange AMEX --timeframe 1d --bars 300 --out spy_daily.csv
+
+    # All indicators
+    python tv_export.py --symbol SPY --exchange AMEX --timeframe 1d --bars 500 --out spy.csv --indicators rsi sma ema atr macd
+
+    # Specific indicators only
+    python tv_export.py --symbol SPY --exchange AMEX --timeframe 1d --bars 500 --out spy.csv --indicators rsi macd
 
 Output is saved to tools/data/<filename>.
+Valid indicators: rsi, sma, ema, atr, macd
 """
 
 import argparse
@@ -21,7 +28,7 @@ from tvDatafeed import Interval, TvDatafeed
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# Timeframe mapping
+# Constants
 # ---------------------------------------------------------------------------
 
 INTERVAL_MAP = {
@@ -38,22 +45,64 @@ INTERVAL_MAP = {
     "1w": Interval.in_weekly,
 }
 
+VALID_INDICATORS = {"rsi", "sma", "ema", "atr", "macd"}
+MA_PERIODS = [5, 10, 20, 50, 100, 200]
+
+# ---------------------------------------------------------------------------
+# Indicator computation
+# ---------------------------------------------------------------------------
+
+def add_indicators(df, indicators: set):
+    close, high, low = df["close"], df["high"], df["low"]
+
+    if "rsi" in indicators:
+        df["rsi_14"] = ta.rsi(close, length=14)
+
+    if "sma" in indicators:
+        for p in MA_PERIODS:
+            df[f"sma_{p}"] = ta.sma(close, length=p)
+
+    if "ema" in indicators:
+        for p in MA_PERIODS:
+            df[f"ema_{p}"] = ta.ema(close, length=p)
+
+    if "atr" in indicators:
+        df["atr_14"] = ta.atr(high, low, close, length=14)
+
+    if "macd" in indicators:
+        macd_df = ta.macd(close)
+        if macd_df is not None and not macd_df.empty:
+            df["macd"]        = macd_df.iloc[:, 0]  # MACD line
+            df["macd_signal"] = macd_df.iloc[:, 2]  # Signal line
+            df["macd_hist"]   = macd_df.iloc[:, 1]  # Histogram
+
+    return df
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="Export historical candle data from TradingView to CSV")
-    parser.add_argument("--symbol",    required=True, help="Ticker symbol, e.g. SPX, SPY, QQQ")
-    parser.add_argument("--exchange",  required=True, help="Exchange, e.g. INDEX, AMEX, NASDAQ, USI")
-    parser.add_argument("--timeframe", required=True, help="Timeframe: 1 3 5 15 30 45 1h 2h 4h 1d 1w")
-    parser.add_argument("--bars",      required=True, type=int, help="Number of candles to fetch")
-    parser.add_argument("--out",       required=True, help="Output filename (saved under tools/data/)")
+    parser.add_argument("--symbol",     required=True, help="Ticker symbol, e.g. SPX, SPY, QQQ")
+    parser.add_argument("--exchange",   required=True, help="Exchange, e.g. INDEX, AMEX, NASDAQ, USI")
+    parser.add_argument("--timeframe",  required=True, help="Timeframe: 1 3 5 15 30 45 1h 2h 4h 1d 1w")
+    parser.add_argument("--bars",       required=True, type=int, help="Number of candles to fetch")
+    parser.add_argument("--out",        required=True, help="Output filename (saved under tools/data/)")
+    parser.add_argument("--indicators", nargs="*", metavar="INDICATOR",
+                        help=f"Indicators to include: {', '.join(sorted(VALID_INDICATORS))}. Omit for no indicators.")
     args = parser.parse_args()
 
     # Validate timeframe
     if args.timeframe not in INTERVAL_MAP:
         print(f"ERROR: unsupported timeframe '{args.timeframe}'. Valid options: {', '.join(INTERVAL_MAP.keys())}")
+        sys.exit(1)
+
+    # Validate indicators
+    requested = set(args.indicators) if args.indicators else set()
+    unknown = requested - VALID_INDICATORS
+    if unknown:
+        print(f"ERROR: unknown indicator(s): {', '.join(sorted(unknown))}. Valid options: {', '.join(sorted(VALID_INDICATORS))}")
         sys.exit(1)
 
     # Load credentials
@@ -81,29 +130,15 @@ def main():
         print("ERROR: no data returned — check symbol and exchange")
         sys.exit(1)
 
-    start = df.index[0]
-    end = df.index[-1]
-    print(f"Fetched {len(df)} rows: {start} → {end}")
+    print(f"Fetched {len(df)} rows: {df.index[0]} → {df.index[-1]}")
 
-    # Drop symbol column if present
+    # Drop symbol column
     df = df.drop(columns=["symbol"], errors="ignore")
 
-    # Compute indicators (NaN for rows without enough history → saved as blank)
-    close, high, low = df["close"], df["high"], df["low"]
-
-    df["rsi_14"] = ta.rsi(close, length=14)
-
-    for p in [5, 10, 20, 50, 100, 200]:
-        df[f"sma_{p}"] = ta.sma(close, length=p)
-        df[f"ema_{p}"] = ta.ema(close, length=p)
-
-    df["atr_14"] = ta.atr(high, low, close, length=14)
-
-    macd_df = ta.macd(close)  # returns DataFrame with 3 columns
-    if macd_df is not None and not macd_df.empty:
-        df["macd"]        = macd_df.iloc[:, 0]  # MACD line
-        df["macd_signal"] = macd_df.iloc[:, 2]  # Signal line
-        df["macd_hist"]   = macd_df.iloc[:, 1]  # Histogram
+    # Add indicators
+    if requested:
+        print(f"Computing indicators: {', '.join(sorted(requested))}...")
+        df = add_indicators(df, requested)
 
     # Save
     df.to_csv(out_path)
