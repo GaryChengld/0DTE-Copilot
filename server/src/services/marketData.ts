@@ -1,5 +1,5 @@
 import YahooFinance from "yahoo-finance2";
-import { SMA, RSI, VWAP } from "technicalindicators";
+import { SMA, RSI, VWAP, ATR } from "technicalindicators";
 
 const yahooFinance = new YahooFinance();
 
@@ -147,6 +147,17 @@ function calcRSI(closes: number[], period: number = 14): number | null {
   return result.length > 0 ? Math.round(result[result.length - 1] * 100) / 100 : null;
 }
 
+function calcATR(candles: { high: number; low: number; close: number }[], period: number = 14): number | null {
+  if (candles.length < period + 1) return null;
+  const result = ATR.calculate({
+    period,
+    high: candles.map((c) => c.high),
+    low: candles.map((c) => c.low),
+    close: candles.map((c) => c.close),
+  });
+  return result.length > 0 ? Math.round(result[result.length - 1] * 100) / 100 : null;
+}
+
 // --- Fetch helpers ---
 
 async function fetchTodayRTHCandles(symbol: string): Promise<{ candles: RTHCandle[]; meta: YFMeta }> {
@@ -187,6 +198,19 @@ async function fetchDailyCloses(symbol: string, days: number): Promise<number[]>
   return (result.quotes ?? []).filter((q) => q.close != null).map((q) => q.close!);
 }
 
+async function fetchDailyCandles(symbol: string, days: number): Promise<{ high: number; low: number; close: number }[]> {
+  const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const result = (await yahooFinance.chart(symbol, {
+    period1,
+    interval: "1d" as const,
+  })) as unknown as YFChartResult;
+
+  return (result.quotes ?? [])
+    .filter((q) => q.high != null && q.low != null && q.close != null)
+    .map((q) => ({ high: q.high!, low: q.low!, close: q.close! }));
+}
+
 // --- SPX daily snapshot (lightweight) ---
 
 export interface SpxDailySnapshot {
@@ -196,10 +220,22 @@ export interface SpxDailySnapshot {
   l: number;
   change: number;
   changePct: number;
+  rsi: number | null;
+  atr: number | null;
+  ma: {
+    "20": number | null;
+    "50": number | null;
+    "100": number | null;
+    "200": number | null;
+  };
 }
 
 export async function fetchSpxDailySnapshot(): Promise<SpxDailySnapshot> {
-  const { candles, meta } = await fetchTodayRTHCandles("^GSPC");
+  const [{ candles, meta }, dailyCloses, dailyCandles] = await Promise.all([
+    fetchTodayRTHCandles("^GSPC"),
+    fetchDailyCloses("^GSPC", 300),
+    fetchDailyCandles("^GSPC", 60),
+  ]);
 
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const hasCandles = candles.length > 0;
@@ -212,7 +248,17 @@ export async function fetchSpxDailySnapshot(): Promise<SpxDailySnapshot> {
   const change = r2(price - prevClose);
   const changePct = prevClose !== 0 ? r2((change / prevClose) * 100) : 0;
 
-  return { price, o, h, l, change, changePct };
+  return {
+    price, o, h, l, change, changePct,
+    rsi: calcRSI(dailyCloses),
+    atr: calcATR(dailyCandles),
+    ma: {
+      "20": calcMA(dailyCloses, 20),
+      "50": calcMA(dailyCloses, 50),
+      "100": calcMA(dailyCloses, 100),
+      "200": calcMA(dailyCloses, 200),
+    },
+  };
 }
 
 // --- Main export ---

@@ -1,4 +1,4 @@
-# Task 19 — SPX Daily Data API
+# Task 19 — SPX Daily Data API ✅ COMPLETED (2026-04-08)
 
 ## Goal
 
@@ -16,8 +16,16 @@ export interface SpxDailySnapshot {
   o: number;
   h: number;
   l: number;
-  change: number;      // price - open (positive = up, negative = down)
-  changePct: number;   // change / open * 100, rounded to 2 decimals
+  change: number;      // price - prev close (positive = up, negative = down)
+  changePct: number;   // change / prev close * 100, rounded to 2 decimals
+  rsi: number | null;  // 14-period daily RSI
+  atr: number | null;  // 14-period daily ATR
+  ma: {
+    "20": number | null;
+    "50": number | null;
+    "100": number | null;
+    "200": number | null;
+  };
 }
 
 export async function fetchSpxDailySnapshot(): Promise<SpxDailySnapshot> {
@@ -34,7 +42,20 @@ export async function fetchSpxDailySnapshot(): Promise<SpxDailySnapshot> {
   const change = r2(price - o);
   const changePct = o !== 0 ? r2((change / o) * 100) : 0;
 
-  return { price, o, h, l, change, changePct };
+  // Fetch daily closes for MA calculation (200 days)
+  const dailyCloses = await fetchDailyCloses("^GSPC", 300);
+
+  return {
+    price, o, h, l, change, changePct,
+    rsi: calcRSI(dailyCloses),
+    atr: calcATR(dailyCandles, 14),
+    ma: {
+      "20": calcMA(dailyCloses, 20),
+      "50": calcMA(dailyCloses, 50),
+      "100": calcMA(dailyCloses, 100),
+      "200": calcMA(dailyCloses, 200),
+    },
+  };
 }
 ```
 
@@ -82,7 +103,7 @@ export default router;
 Response shape:
 ```json
 {
-  "spx": { "price": 5623.50, "o": 5610.00, "h": 5635.20, "l": 5605.30, "change": 13.50, "changePct": 0.24 },
+  "spx": { "price": 5623.50, "o": 5610.00, "h": 5635.20, "l": 5605.30, "change": 13.50, "changePct": 0.24, "ma": { "20": 5580.00, "50": 5500.00, "100": 5400.00, "200": 5200.00 } },
   "indexes": { "vix": 18.5, "add": -320, "tick": -280 }
 }
 ```

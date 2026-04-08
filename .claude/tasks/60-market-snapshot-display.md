@@ -1,4 +1,4 @@
-# Task 60 — Market Snapshot Display in Market Data Panel
+# Task 60 — Market Snapshot Display in Market Data Panel ✅ COMPLETED (2026-04-08)
 
 ## Goal
 
@@ -21,6 +21,9 @@ Display SPX daily stats and latest VIX/$ADD/$TICK values above the TradingView c
 │  (existing h-[50%])│
 │                    │
 ├────────────────────┤
+│  RSI: 58.2  ATR: 42.5  │
+│  MA20  MA50  MA100 MA200 │  ← green if MA < price, red if MA > price
+├────────────────────┤
 │  (future sections) │
 └────────────────────┘
 ```
@@ -40,6 +43,9 @@ export interface MarketSnapshot {
     l: number;
     change: number;
     changePct: number;
+    rsi: number | null;
+    atr: number | null;
+    ma: { "20": number | null; "50": number | null; "100": number | null; "200": number | null };
   };
   indexes: {
     vix: number | null;

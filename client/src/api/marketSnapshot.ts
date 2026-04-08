@@ -6,6 +6,9 @@ export interface MarketSnapshot {
     l: number;
     change: number;
     changePct: number;
+    rsi: number | null;
+    atr: number | null;
+    ma: { "20": number | null; "50": number | null; "100": number | null; "200": number | null };
   };
   indexes: {
     vix: number | null;
