@@ -1,4 +1,5 @@
 import { config } from '../config.js'
+import { getAllKeywords } from '../db/newsKeywordsRepository.js'
 
 type FinnhubNewsItem = {
   headline: string
@@ -30,63 +31,23 @@ function formatET(unixSeconds: number): string {
   )
 }
 
-const ECONOMIC_KEYWORDS = [
-  'fed',
-  'federal reserve',
-  'fomc',
-  'powell',
-  'rate cut',
-  'rate hike',
-  'interest rate',
-  'cpi',
-  'inflation',
-  'gdp',
-  'jobs',
-  'nonfarm',
-  'nfp',
-  'unemployment',
-  'payroll',
-  'treasury',
-  'yield',
-  'recession',
-  'economic',
-  'economy',
-  'fiscal',
-  'monetary',
-  'debt ceiling',
-  'tariff',
-  'trade war',
-  'stimulus',
-  'quantitative',
-  'war',
-  'ceasefire',
-  'sanction',
-  'iran',
-  'china',
-  'russia',
-  'trump',
-  'opec',
-  'oil price',
-  'geopolit',
-  'congress',
-  'senate',
-  'white house',
-  'executive order',
-]
-
-function isEconomicNews(headline: string): boolean {
-  const lower = headline.toLowerCase()
-  return ECONOMIC_KEYWORDS.some((kw) => lower.includes(kw))
-}
-
 export async function fetchLatestNews(limit: number = 10): Promise<NewsItem[]> {
-  const url = `https://finnhub.io/api/v1/news?category=general&token=${config.finnhubApiKey}`
-  const res = await fetch(url)
+  const [keywords, res] = await Promise.all([
+    getAllKeywords(),
+    fetch(`https://finnhub.io/api/v1/news?category=general&token=${config.finnhubApiKey}`),
+  ])
+
   if (!res.ok) throw new Error(`Finnhub responded with ${res.status}`)
   const data = (await res.json()) as FinnhubNewsItem[]
+
+  const isRelevant = (headline: string) => {
+    const lower = headline.toLowerCase()
+    return keywords.some((kw) => lower.includes(kw))
+  }
+
   return data
     .sort((a, b) => b.datetime - a.datetime)
-    .filter((item) => isEconomicNews(item.headline))
+    .filter((item) => isRelevant(item.headline))
     .slice(0, limit)
     .map((item) => ({
       title: item.headline,

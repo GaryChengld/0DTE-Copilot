@@ -40,7 +40,7 @@ interface TradingViewChartProps {
 }
 
 export default function TradingViewChart({
-  symbol = "AMEX:SPY",
+  symbol = "AMEX:SPY",  // SPY has free real-time data in TradingView embed; updates live during RTH
   interval = "5",
 }: TradingViewChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);

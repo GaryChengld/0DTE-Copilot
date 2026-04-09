@@ -187,6 +187,40 @@ async function fetchTodayRTHCandles(symbol: string): Promise<{ candles: RTHCandl
   return { candles, meta: result.meta };
 }
 
+// Fetch the most recent trading day's RTH 5-min candles (works outside market hours / weekends)
+async function fetchLatestRTHCandles(symbol: string): Promise<{ candles: RTHCandle[]; meta: YFMeta }> {
+  const period1 = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000); // look back 5 days
+
+  const result = (await yahooFinance.chart(symbol, {
+    period1,
+    interval: "5m" as const,
+  })) as unknown as YFChartResult;
+
+  const valid = (result.quotes ?? []).filter((q) =>
+    q.date != null &&
+    q.open != null &&
+    q.high != null &&
+    q.low != null &&
+    q.close != null &&
+    q.volume != null &&
+    q.volume > 0 &&
+    isRTHCandle(q.date)
+  ) as RTHCandle[];
+
+  // Group by ET date, pick the most recent
+  const byDate = new Map<string, RTHCandle[]>();
+  for (const c of valid) {
+    const dateET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(c.date);
+    if (!byDate.has(dateET)) byDate.set(dateET, []);
+    byDate.get(dateET)!.push(c);
+  }
+
+  const latestDate = [...byDate.keys()].sort().at(-1);
+  const candles = latestDate ? byDate.get(latestDate)! : [];
+
+  return { candles, meta: result.meta };
+}
+
 async function fetchDailyCloses(symbol: string, days: number): Promise<number[]> {
   const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -209,6 +243,65 @@ async function fetchDailyCandles(symbol: string, days: number): Promise<{ high: 
   return (result.quotes ?? [])
     .filter((q) => q.high != null && q.low != null && q.close != null)
     .map((q) => ({ high: q.high!, low: q.low!, close: q.close! }));
+}
+
+// --- SPX intraday candles ---
+
+export interface SpxCandle {
+  t: string;          // "HH:mm" ET — candle open time
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;          // SPY volume (used for VWAP)
+  vwap: number;       // cumulative VWAP up to and including this candle
+  rsi: number | null; // RSI(14) seeded with daily closes — available from first intraday candle
+  open: boolean;      // true = candle still in progress
+}
+
+export async function fetchSpxCandles(): Promise<SpxCandle[]> {
+  const [spxResult, spyResult, seedCloses] = await Promise.all([
+    fetchLatestRTHCandles("^GSPC"),
+    fetchLatestRTHCandles("SPY"),
+    fetchDailyCloses("^GSPC", 30), // seed RSI so first intraday candle has a value
+  ]);
+
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  const merged = spxResult.candles.map((spx) => {
+    const spy = spyResult.candles.find((s) => s.date.getTime() === spx.date.getTime());
+    return { ...spx, volume: spy?.volume ?? 0 };
+  });
+
+  // Compute RSI on [seedCloses + intraday closes] so every intraday candle has a value
+  const intradayCloses = merged.map((c) => c.close);
+  const combined = [...seedCloses, ...intradayCloses];
+  const rsiAll = RSI.calculate({ period: 14, values: combined });
+  // rsiAll has (combined.length - 14) values; last intradayCloses.length are for intraday candles
+  const rsiIntraday = rsiAll.slice(rsiAll.length - intradayCloses.length);
+
+  let cumTPV = 0;
+  let cumVol = 0;
+
+  return merged.map((c, i) => {
+    const tp = (c.high + c.low + c.close) / 3;
+    cumTPV += tp * c.volume;
+    cumVol += c.volume;
+    const vwap = cumVol > 0 ? r2(cumTPV / cumVol) : r2(c.close);
+    const rsi = rsiIntraday[i] != null ? r2(rsiIntraday[i]) : null;
+
+    return {
+      t: formatTimeET(c.date),
+      o: r2(c.open),
+      h: r2(c.high),
+      l: r2(c.low),
+      c: r2(c.close),
+      v: c.volume,
+      vwap,
+      rsi,
+      open: !isCandleClosed(c.date),
+    };
+  });
 }
 
 // --- SPX daily snapshot (lightweight) ---

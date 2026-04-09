@@ -1,33 +1,48 @@
-import TradingViewChart from "./TradingViewChart";
 import SpxSummary from "./SpxSummary";
 import IndexTicker from "./IndexTicker";
+import SpxCandleChart from "./SpxCandleChart";
+import TradingViewHeatmap from "./TradingViewHeatmap";
 import { useMarketSnapshot } from "../hooks/useMarketSnapshot";
+import { useSpxCandles } from "../hooks/useSpxCandles";
 
 export default function MarketDataPanel() {
   const snapshot = useMarketSnapshot();
+  const candles = useSpxCandles();
 
   return (
     <aside
-      className="w-[20%] flex flex-col shrink-0 overflow-y-auto"
+      className="w-[20%] flex flex-col gap-2 p-2 overflow-hidden"
       style={{ background: "var(--bg-panel)", borderRight: "1px solid var(--border)" }}
     >
-      {/* Market snapshot — above chart */}
-      <div className="p-2 space-y-2 shrink-0">
+      {/* SPX summary — natural height */}
+      <div className="shrink-0">
         <SpxSummary spx={snapshot?.spx ?? null} />
+      </div>
+
+      {/* Index ticker — natural height */}
+      <div className="shrink-0">
         <IndexTicker indexes={snapshot?.indexes ?? null} />
       </div>
 
-      {/* TradingView Chart */}
-      <div className="h-[50%] shrink-0 p-2">
+      {/* SPX Candle Chart */}
+      <div className="h-[45%] shrink-0">
         <div
           className="h-full rounded-lg overflow-hidden"
           style={{ border: "1px solid var(--border)" }}
         >
-          <TradingViewChart />
+          <SpxCandleChart candles={candles} />
         </div>
       </div>
 
-      {/* Future market data sections go here */}
+      {/* S&P 500 Heatmap — fills remaining space */}
+      <div className="flex-1 min-h-0">
+        <div
+          className="h-full rounded-lg overflow-hidden"
+          style={{ border: "1px solid var(--border)" }}
+        >
+          <TradingViewHeatmap />
+        </div>
+      </div>
     </aside>
   );
 }

@@ -87,6 +87,8 @@ npm run build            # build frontend for production
 | [17-other-indexes-api](.claude/tasks/17-other-indexes-api.md) | POST /api/other_indexes — manually feed intraday VIX/ADD/TICK history included in analysis payload | 2026-03-30 |
 | [18-latest-news-api](.claude/tasks/18-latest-news-api.md) | GET /api/news — latest economic finance headlines from Finnhub | 2026-04-03 |
 | [19-spx-daily-api](.claude/tasks/19-spx-daily-api.md) | GET /api/market-snapshot — SPX daily snapshot + latest VIX/ADD/TICK | 2026-04-08 |
+| [20-news-keywords-api](.claude/tasks/20-news-keywords-api.md) | NewsKeyword table + GET/PUT /api/news/keywords — manage news filter keywords via DB | 2026-04-08 |
+| [21-spx-candles-api](.claude/tasks/21-spx-candles-api.md) | GET /api/spx/candles — all today's RTH 5-min SPX candles with per-candle VWAP | 2026-04-08 |
 
 ### Client
 
@@ -102,6 +104,7 @@ npm run build            # build frontend for production
 | [58-news-panel](.claude/tasks/58-news-panel.md) | News panel in right sidebar — economic headlines from Finnhub, tab-switched with Positions | 2026-04-03 |
 | [59-tradingview-chart](.claude/tasks/59-tradingview-chart.md) | Market Data panel (left panel) — TradingView embedded SPX chart, extensible for future market data | 2026-04-08 |
 | [60-market-snapshot-display](.claude/tasks/60-market-snapshot-display.md) | SPX summary + VIX/ADD/TICK ticker above chart in Market Data panel | 2026-04-08 |
+| [61-spx-candle-chart](.claude/tasks/61-spx-candle-chart.md) | Replace TradingView embed with lightweight-charts candlestick chart — SPX 5-min + VWAP + volume + RSI | 2026-04-08 |
 
 ### Tools
 
