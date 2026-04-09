@@ -7,6 +7,7 @@ import MarketSummaryModal from "./components/MarketSummaryModal";
 import OtherIndexesPanel from "./components/OtherIndexesPanel";
 import OpenPositions from "./components/OpenPositions";
 import NewsPanel from "./components/NewsPanel";
+import NewsKeywordsModal from "./components/NewsKeywordsModal";
 import MarketDataPanel from "./components/MarketDataPanel";
 import { getNews, type NewsItem } from "./api/news";
 
@@ -21,6 +22,7 @@ export default function App() {
   const [previewTrigger, setPreviewTrigger] = useState<PreviewTrigger | null>(null);
   const [previewCounter, setPreviewCounter] = useState(0);
   const [indexesOpen, setIndexesOpen] = useState(false);
+  const [keywordsOpen, setKeywordsOpen] = useState(false);
   const [news, setNews] = useState<NewsItem[] | null>(null);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export default function App() {
               </div>
             )}
             {sidebarTab === "news" && (
-              <NewsPanel news={news} loading={newsLoading} error={newsError} onRefresh={loadNews} />
+              <NewsPanel news={news} loading={newsLoading} error={newsError} onRefresh={loadNews} onKeywords={() => setKeywordsOpen(true)} />
             )}
           </div>
         </aside>
@@ -136,6 +138,9 @@ export default function App() {
 
       {marketSummaryOpen && (
         <MarketSummaryModal onClose={() => setMarketSummaryOpen(false)} />
+      )}
+      {keywordsOpen && (
+        <NewsKeywordsModal onClose={() => setKeywordsOpen(false)} />
       )}
 
       <OtherIndexesPanel open={indexesOpen} />

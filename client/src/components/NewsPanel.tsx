@@ -1,4 +1,4 @@
-import { RefreshCw, Loader2 } from "lucide-react";
+import { RefreshCw, Loader2, Settings } from "lucide-react";
 import type { NewsItem } from "../api/news";
 
 interface Props {
@@ -6,9 +6,10 @@ interface Props {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
+  onKeywords: () => void;
 }
 
-export default function NewsPanel({ news, loading, error, onRefresh }: Props) {
+export default function NewsPanel({ news, loading, error, onRefresh, onKeywords }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* Panel header */}
@@ -16,6 +17,14 @@ export default function NewsPanel({ news, loading, error, onRefresh }: Props) {
         <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
           Economic News
         </span>
+        <div className="flex items-center gap-1">
+        <button
+          onClick={onKeywords}
+          className="p-1 rounded hover:bg-white/10 transition-colors"
+          title="Edit keywords"
+        >
+          <Settings size={14} style={{ color: "var(--text-muted)" }} />
+        </button>
         <button
           onClick={onRefresh}
           disabled={loading}
@@ -28,6 +37,7 @@ export default function NewsPanel({ news, loading, error, onRefresh }: Props) {
             <RefreshCw size={14} style={{ color: "var(--text-muted)" }} />
           )}
         </button>
+        </div>
       </div>
 
       {/* Content */}
