@@ -13,8 +13,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Backend:** Express.js + Socket.io (real-time streaming)
 - **Database:** SQLite via Prisma ORM
 - **AI:** Multi-provider LLM support — Google Gemini, OpenAI, Claude (persistent chat session, lazy-initialized)
-- **Market Data:** `yahoo-finance2` (on-demand 5-min OHLC + daily candles for SPX and SPY)
-- **Indicators:** `technicalindicators` library (VWAP, SMA, RSI)
+- **Market Data:** `yahoo-finance2` (on-demand 5-min OHLC + daily candles for SPX, SPY, and 11 sector ETFs)
+- **Indicators:** `technicalindicators` library (VWAP, SMA, RSI, ATR)
+- **Charts:** `lightweight-charts` v5 (SPX candlestick chart with VWAP, volume, RSI pane)
 
 ## Repository Structure
 
@@ -89,6 +90,7 @@ npm run build            # build frontend for production
 | [19-spx-daily-api](.claude/tasks/19-spx-daily-api.md) | GET /api/market-snapshot — SPX daily snapshot + latest VIX/ADD/TICK | 2026-04-08 |
 | [20-news-keywords-api](.claude/tasks/20-news-keywords-api.md) | NewsKeyword table + GET/PUT /api/news/keywords — manage news filter keywords via DB | 2026-04-08 |
 | [21-spx-candles-api](.claude/tasks/21-spx-candles-api.md) | GET /api/spx/candles — all today's RTH 5-min SPX candles with per-candle VWAP | 2026-04-08 |
+| [22-sector-etf-api](.claude/tasks/22-sector-etf-api.md) | GET /api/etf/sectors — live price + % change for 11 S&P 500 sector ETFs | 2026-04-09 |
 
 ### Client
 
@@ -105,6 +107,8 @@ npm run build            # build frontend for production
 | [59-tradingview-chart](.claude/tasks/59-tradingview-chart.md) | Market Data panel (left panel) — TradingView embedded SPX chart, extensible for future market data | 2026-04-08 |
 | [60-market-snapshot-display](.claude/tasks/60-market-snapshot-display.md) | SPX summary + VIX/ADD/TICK ticker above chart in Market Data panel | 2026-04-08 |
 | [61-spx-candle-chart](.claude/tasks/61-spx-candle-chart.md) | Replace TradingView embed with lightweight-charts candlestick chart — SPX 5-min + VWAP + volume + RSI | 2026-04-08 |
+| [62-spx-heatmap](.claude/tasks/62-spx-heatmap.md) | Sector ETF heatmap — 11 S&P 500 sector ETFs in 2-column color-coded grid, 30s polling | 2026-04-09 |
+| [63-news-keywords-editor](.claude/tasks/63-news-keywords-editor.md) | News Keywords modal editor — inline editable list with add/delete, gear icon in News panel | 2026-04-09 |
 
 ### Tools
 
@@ -130,6 +134,11 @@ npm run build            # build frontend for production
 | GET | `/api/trades/open` | Retrieve all open trades |
 | DELETE | `/api/trades/:id` | Delete a trade and its exits |
 | GET | `/api/news` | Latest 10 economic finance headlines from Finnhub |
+| GET | `/api/news/keywords` | Return all news filter keywords |
+| PUT | `/api/news/keywords` | Replace news filter keyword list |
+| GET | `/api/market-snapshot` | SPX daily snapshot (price, O/H/L, change, RSI, ATR, MAs) + latest VIX/ADD/TICK |
+| GET | `/api/spx/candles` | All today's RTH 5-min SPX candles with VWAP and RSI |
+| GET | `/api/etf/sectors` | Live price + % change for 11 S&P 500 sector ETFs |
 
 ## Health Check
 
@@ -160,7 +169,11 @@ npm run build            # build frontend for production
 | `db/otherIndexesRepository.ts` | Upserts and retrieves today's intraday VIX/ADD/TICK snapshots by `tradeDate` + `time` |
 | `utils/marketHours.ts` | Helper to check if current time is within RTH (Mon–Fri 09:30–16:00 ET) |
 | Socket.io layer | Broadcasts AI responses to frontend via `chat:response` event |
-| `services/news.ts` | Fetches latest economic headlines from Finnhub API; keyword-filters for macro relevance |
+| `services/news.ts` | Fetches latest economic headlines from Finnhub API; keyword-filters using keywords from DB |
+| `db/newsKeywordsRepository.ts` | Stores and retrieves news filter keywords from `NewsKeyword` table |
+| `routes/marketSnapshot.ts` | `GET /api/market-snapshot` — SPX daily snapshot + latest VIX/ADD/TICK |
+| `routes/spxCandles.ts` | `GET /api/spx/candles` — today's RTH 5-min candles with VWAP + RSI |
+| `routes/sectorEtfs.ts` | `GET /api/etf/sectors` — 11 sector ETF prices and % change |
 | `tools/tv_feed.py` | Python polling script — fetches VIX/$ADD/$TICK from TradingView and POSTs to `/api/other_indexes` |
 | `tools/tv_export.py` | Python export script — downloads historical OHLCV candles from TradingView and computes RSI/SMA/EMA/ATR/MACD indicators into a CSV |
 

@@ -16,7 +16,7 @@ type SidebarTab = "positions" | "news";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("conversation");
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("positions");
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("news");
   const [marketSummaryOpen, setMarketSummaryOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [previewTrigger, setPreviewTrigger] = useState<PreviewTrigger | null>(null);
@@ -109,7 +109,7 @@ export default function App() {
         <aside className="w-[20%] flex flex-col shrink-0" style={{ background: "var(--bg-panel)", borderLeft: "1px solid var(--border)" }}>
           {/* Sidebar tab bar */}
           <div className="flex shrink-0" style={{ borderBottom: "1px solid var(--border)" }}>
-            {(["positions", "news"] as SidebarTab[]).map((tab) => (
+            {(["news", "positions"] as SidebarTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setSidebarTab(tab)}

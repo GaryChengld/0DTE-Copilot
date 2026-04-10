@@ -1,8 +1,8 @@
-# Task 62 — S&P 500 Heatmap (TradingView Widget) ✅ COMPLETED (2026-04-08)
+# Task 62 — Sector ETF Heatmap (Market Data Panel) ✅ COMPLETED (2026-04-09)
 
 ## Goal
 
-Add a TradingView Stock Heatmap widget below the SPX candlestick chart in the Market Data Panel. The heatmap shows S&P 500 stocks sized by market cap and colored by % change, grouped by sector — giving instant visual context for sector rotation during 0DTE trading sessions.
+Replace the TradingView heatmap widget with a custom sector ETF heatmap built from live Yahoo Finance data. The heatmap displays all 11 S&P 500 sector ETFs as a 2-column grid of colored tiles — green for up, red for down, with color intensity reflecting magnitude. Data comes from `GET /api/etf/sectors` (Task 22) and is polled every 30 seconds.
 
 ## Layout
 
@@ -14,87 +14,156 @@ Add a TradingView Stock Heatmap widget below the SPX candlestick chart in the Ma
 ├──────────────────────────┤
 │  SpxCandleChart          │  ← 45% panel height
 ├──────────────────────────┤
-│  TradingView Heatmap     │  ← fills remaining space
+│  ETF Heatmap             │  ← fills remaining space
+│  ┌──────────┬──────────┐ │
+│  │Technology│ Financials│ │
+│  │  XLK     │  XLF     │ │
+│  │ +1.24%   │ -0.31%   │ │
+│  ├──────────┼──────────┤ │
+│  │  Energy  │Health Care│ │
+│  │  XLE     │  XLV     │ │
+│  │ +2.10%   │ +0.44%   │ │
+│  └──────────┴──────────┘ │
+│  ...                      │
 └──────────────────────────┘
 ```
 
 ## Changes
 
-### New: `client/src/components/TradingViewHeatmap.tsx`
+### Remove: `client/src/components/TradingViewHeatmap.tsx`
 
-Embed TradingView's Stock Heatmap widget using a `<script>` injected into a container div via `useEffect` (same pattern as `TradingViewChart.tsx`).
+No longer needed — replace with `EtfHeatmap`.
 
-```tsx
-import { useEffect, useRef } from "react";
+### New: `client/src/api/sectorEtfs.ts`
 
-export default function TradingViewHeatmap() {
-  const containerRef = useRef<HTMLDivElement>(null);
+```typescript
+export interface SectorEtf {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePct: number;
+}
+
+export async function fetchSectorEtfs(): Promise<SectorEtf[]> {
+  const res = await fetch("/api/etf/sectors");
+  if (!res.ok) throw new Error(`etf/sectors: ${res.status}`);
+  const data = await res.json();
+  return data.etfs;
+}
+```
+
+### New: `client/src/hooks/useSectorEtfs.ts`
+
+Poll every 30 seconds, same pattern as `useSpxCandles`:
+
+```typescript
+import { useEffect, useState } from "react";
+import { fetchSectorEtfs, type SectorEtf } from "../api/sectorEtfs";
+
+export function useSectorEtfs() {
+  const [etfs, setEtfs] = useState<SectorEtf[]>([]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const poll = () =>
+      fetchSectorEtfs()
+        .then(setEtfs)
+        .catch(() => {});
 
-    container.innerHTML = "";
-
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      exchanges: [],
-      dataSource: "SPX500",
-      grouping: "sector",
-      blockSize: "market_cap_basic",
-      blockColor: "change",
-      locale: "en",
-      colorTheme: "dark",
-      hasTopBar: false,
-      isDataSetEnabled: false,
-      isZoomEnabled: true,
-      hasSymbolTooltip: true,
-      isMonoSize: false,
-      width: "100%",
-      height: "100%",
-    });
-
-    container.appendChild(script);
-
-    return () => {
-      container.innerHTML = "";
-    };
+    poll();
+    const id = setInterval(poll, 30_000);
+    return () => clearInterval(id);
   }, []);
 
+  return etfs;
+}
+```
+
+### New: `client/src/components/EtfHeatmap.tsx`
+
+A 2-column grid of ETF tiles. Each tile has:
+- Sector name (top, small, muted)
+- Symbol (middle, small)
+- % change (bottom, bold, colored)
+- Background color scaled by % change magnitude
+
+**Color scale:**
+- `changePct >= +2%` → `#1a4731` (deep green)
+- `changePct >= +1%` → `#1a3a28` (medium green)
+- `changePct > 0`    → `#162a20` (light green)
+- `changePct === 0`  → `var(--bg-card)` (neutral)
+- `changePct < 0`    → `#2d1a1a` (light red)
+- `changePct <= -1%` → `#3a1a1a` (medium red)
+- `changePct <= -2%` → `#4a1a1a` (deep red)
+
+**Text color:** `text-green-400` for positive, `text-red-400` for negative, muted for zero.
+
+**Empty state:** Show a subtle placeholder grid when `etfs` is empty (initial load).
+
+```tsx
+import { useSectorEtfs } from "../hooks/useSectorEtfs";
+
+function tileBackground(changePct: number): string {
+  if (changePct >= 2)  return "#1a4731";
+  if (changePct >= 1)  return "#1a3a28";
+  if (changePct > 0)   return "#162a20";
+  if (changePct <= -2) return "#4a1a1a";
+  if (changePct <= -1) return "#3a1a1a";
+  if (changePct < 0)   return "#2d1a1a";
+  return "var(--bg-card)";
+}
+
+function changeColor(changePct: number): string {
+  if (changePct > 0) return "#4ade80";  // green-400
+  if (changePct < 0) return "#f87171";  // red-400
+  return "var(--text-muted)";
+}
+
+export default function EtfHeatmap() {
+  const etfs = useSectorEtfs();
+
   return (
-    <div className="tradingview-widget-container h-full w-full" ref={containerRef} />
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="px-3 py-1.5 shrink-0" style={{ borderBottom: "1px solid var(--border)" }}>
+        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          Sector ETFs
+        </span>
+      </div>
+
+      {/* Grid */}
+      <div className="flex-1 overflow-y-auto p-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
+          {etfs.map((etf) => (
+            <div
+              key={etf.symbol}
+              className="rounded p-2 flex flex-col gap-0.5"
+              style={{ background: tileBackground(etf.changePct) }}
+            >
+              <span className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{etf.name}</span>
+              <span className="text-xs font-medium text-gray-300">{etf.symbol}</span>
+              <span className="text-sm font-bold" style={{ color: changeColor(etf.changePct) }}>
+                {etf.changePct >= 0 ? "+" : ""}{etf.changePct.toFixed(2)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 ```
 
-Key decisions:
-- `dataSource: "SPX500"` — S&P 500 constituents only (relevant to SPX 0DTE)
-- `blockSize: "market_cap_basic"` — tiles sized by market cap weight (reflects actual index composition)
-- `blockColor: "change"` — colored by % change from previous close
-- `grouping: "sector"` — grouped by GICS sector for rotation visibility
-- `hasTopBar: false` — hides TradingView header to save vertical space
-- `colorTheme: "dark"` — matches app dark theme
-
 ### Modify: `client/src/components/MarketDataPanel.tsx`
 
-- Import `TradingViewHeatmap`
-- Add heatmap section below the chart using `flex-1 min-h-0` to fill remaining space
-
-```tsx
-{/* Heatmap — fills remaining space */}
-<div className="flex-1 min-h-0">
-  <div className="h-full rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-    <TradingViewHeatmap />
-  </div>
-</div>
-```
+- Remove `TradingViewHeatmap` import
+- Import `EtfHeatmap`
+- Replace `<TradingViewHeatmap />` with `<EtfHeatmap />`
+- `useSectorEtfs` is called inside `EtfHeatmap` directly, no prop needed
 
 ## Done When
 
-- TradingView heatmap renders below the SPX chart in the Market Data panel
-- Heatmap fills remaining vertical space after the chart
-- S&P 500 stocks shown sized by market cap, colored by % change, grouped by sector
-- Dark theme matches app
+- 11 sector ETF tiles render in a 2-column grid below the SPX chart
+- Tiles colored green/red with intensity by % change magnitude
+- Data refreshes every 30 seconds during market hours
 - No TypeScript or build errors (`npm run build`)

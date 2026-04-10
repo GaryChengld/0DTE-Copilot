@@ -81,8 +81,6 @@ router.post('/ai/analyze', async (req: Request, res: Response) => {
     const message = JSON.stringify(await buildAnalysisPayload(user_notes))
     const response = await sendToAI(message, true)
 
-    console.log('[Analysis response]\n', response)
-
     await createAiAdvice({ source: 'user', prompt: message, response, provider: config.llm.provider })
     io.emit('chat:response', { source: 'user', response })
 

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Expose all of today's SPX RTH 5-minute candles (including the current unfinished candle) with per-candle VWAP via a new `GET /api/spx/candles` endpoint. This feeds the custom Lightweight Charts candlestick chart in Task 61.
+Expose the latest 80 SPX RTH 5-minute candles (including the current unfinished candle) with per-candle VWAP via a new `GET /api/spx/candles` endpoint. Candles span multiple trading days when needed (e.g. early in the session when today has fewer than 80 candles). This feeds the custom Lightweight Charts candlestick chart in Task 61.
 
 ## Background
 

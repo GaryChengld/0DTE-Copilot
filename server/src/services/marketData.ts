@@ -108,6 +108,20 @@ function formatTimeET(date: Date): string {
   return `${hour}:${minute}`;
 }
 
+// Returns "YYYY-MM-DDTHH:mm" in ET — used for multi-day candle timestamps
+function formatDateTimeET(date: Date): string {
+  const dateET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(date);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const hour = parts.find((p) => p.type === "hour")!.value;
+  const minute = parts.find((p) => p.type === "minute")!.value;
+  return `${dateET}T${hour}:${minute}`;
+}
+
 // Snap a timestamp to the 15-minute boundary in ET (e.g. 09:35 → "09:30")
 function snap15mET(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -221,6 +235,29 @@ async function fetchLatestRTHCandles(symbol: string): Promise<{ candles: RTHCand
   return { candles, meta: result.meta };
 }
 
+// Returns the last `limit` RTH 5-min candles across multiple trading days (sorted ascending)
+async function fetchRecentRTHCandles(symbol: string, limit: number): Promise<{ candles: RTHCandle[]; meta: YFMeta }> {
+  const period1 = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+  const result = (await yahooFinance.chart(symbol, {
+    period1,
+    interval: "5m" as const,
+  })) as unknown as YFChartResult;
+
+  const valid = ((result.quotes ?? []).filter((q) =>
+    q.date != null &&
+    q.open != null &&
+    q.high != null &&
+    q.low != null &&
+    q.close != null &&
+    q.volume != null &&
+    q.volume > 0 &&
+    isRTHCandle(q.date)
+  ) as RTHCandle[]).sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  return { candles: valid.slice(-limit), meta: result.meta };
+}
+
 async function fetchDailyCloses(symbol: string, days: number): Promise<number[]> {
   const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -248,21 +285,23 @@ async function fetchDailyCandles(symbol: string, days: number): Promise<{ high: 
 // --- SPX intraday candles ---
 
 export interface SpxCandle {
-  t: string;          // "HH:mm" ET — candle open time
+  t: string;          // "YYYY-MM-DDTHH:mm" ET — candle open date+time
   o: number;
   h: number;
   l: number;
   c: number;
   v: number;          // SPY volume (used for VWAP)
-  vwap: number;       // cumulative VWAP up to and including this candle
-  rsi: number | null; // RSI(14) seeded with daily closes — available from first intraday candle
+  vwap: number;       // cumulative VWAP, resets each trading day
+  rsi: number | null; // RSI(14) seeded with daily closes
   open: boolean;      // true = candle still in progress
 }
 
+const CANDLE_LIMIT = 80;
+
 export async function fetchSpxCandles(): Promise<SpxCandle[]> {
   const [spxResult, spyResult, seedCloses] = await Promise.all([
-    fetchLatestRTHCandles("^GSPC"),
-    fetchLatestRTHCandles("SPY"),
+    fetchRecentRTHCandles("^GSPC", CANDLE_LIMIT),
+    fetchRecentRTHCandles("SPY", CANDLE_LIMIT),
     fetchDailyCloses("^GSPC", 30), // seed RSI so first intraday candle has a value
   ]);
 
@@ -277,13 +316,21 @@ export async function fetchSpxCandles(): Promise<SpxCandle[]> {
   const intradayCloses = merged.map((c) => c.close);
   const combined = [...seedCloses, ...intradayCloses];
   const rsiAll = RSI.calculate({ period: 14, values: combined });
-  // rsiAll has (combined.length - 14) values; last intradayCloses.length are for intraday candles
   const rsiIntraday = rsiAll.slice(rsiAll.length - intradayCloses.length);
 
+  // VWAP resets each trading day
   let cumTPV = 0;
   let cumVol = 0;
+  let currentDateET = "";
 
   return merged.map((c, i) => {
+    const candleDateET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(c.date);
+    if (candleDateET !== currentDateET) {
+      cumTPV = 0;
+      cumVol = 0;
+      currentDateET = candleDateET;
+    }
+
     const tp = (c.high + c.low + c.close) / 3;
     cumTPV += tp * c.volume;
     cumVol += c.volume;
@@ -291,7 +338,7 @@ export async function fetchSpxCandles(): Promise<SpxCandle[]> {
     const rsi = rsiIntraday[i] != null ? r2(rsiIntraday[i]) : null;
 
     return {
-      t: formatTimeET(c.date),
+      t: formatDateTimeET(c.date),
       o: r2(c.open),
       h: r2(c.high),
       l: r2(c.low),
@@ -302,6 +349,50 @@ export async function fetchSpxCandles(): Promise<SpxCandle[]> {
       open: !isCandleClosed(c.date),
     };
   });
+}
+
+// --- Sector ETF snapshots ---
+
+export interface SectorEtf {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePct: number;
+}
+
+const SECTOR_ETFS: { symbol: string; name: string }[] = [
+  { symbol: "XLK",  name: "Technology" },
+  { symbol: "XLC",  name: "Communication" },
+  { symbol: "XLY",  name: "Cons. Discret." },
+  { symbol: "XLP",  name: "Cons. Staples" },
+  { symbol: "XLV",  name: "Health Care" },
+  { symbol: "XLF",  name: "Financials" },
+  { symbol: "XLI",  name: "Industrials" },
+  { symbol: "XLB",  name: "Materials" },
+  { symbol: "XLRE", name: "Real Estate" },
+  { symbol: "XLU",  name: "Utilities" },
+  { symbol: "XLE",  name: "Energy" },
+];
+
+export async function fetchSectorEtfs(): Promise<SectorEtf[]> {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  return Promise.all(
+    SECTOR_ETFS.map(async ({ symbol, name }) => {
+      const result = (await yahooFinance.chart(symbol, {
+        period1: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        interval: "1d" as const,
+      })) as unknown as YFChartResult;
+
+      const price = r2(result.meta.regularMarketPrice ?? 0);
+      const prevClose = result.meta.chartPreviousClose ?? price;
+      const change = r2(price - prevClose);
+      const changePct = prevClose !== 0 ? r2((change / prevClose) * 100) : 0;
+
+      return { symbol, name, price, change, changePct };
+    })
+  );
 }
 
 // --- SPX daily snapshot (lightweight) ---

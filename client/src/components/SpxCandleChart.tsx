@@ -12,14 +12,11 @@ interface SpxCandleChartProps {
   candles: SpxCandle[];
 }
 
-// Convert "HH:mm" ET string to Unix seconds.
-// We treat the ET time as UTC ("fake UTC") so the chart displays the correct ET labels
+// Convert "YYYY-MM-DDTHH:mm" ET string to Unix seconds.
+// We treat the ET datetime as UTC ("fake UTC") so the chart displays correct ET labels
 // without any timezone offset — lightweight-charts displays timestamps in UTC by default.
 function toUnixET(timeStr: string): number {
-  const todayET = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-  }).format(new Date());
-  return Math.floor(new Date(`${todayET}T${timeStr}:00Z`).getTime() / 1000);
+  return Math.floor(new Date(`${timeStr}:00Z`).getTime() / 1000);
 }
 
 
@@ -180,11 +177,14 @@ export default function SpxCandleChart({ candles }: SpxCandleChartProps) {
       .map((c) => ({ time: toUnixET(c.t), value: c.rsi! }));
 
     if (rsiData.length > 0) {
-      const t0 = toUnixET(candles[0].t);
-      const t1 = toUnixET(candles[candles.length - 1].t);
       rsiSeries.setData(rsiData);
-      rsi70Series.setData([{ time: t0, value: 70 }, { time: t1, value: 70 }]);
-      rsi30Series.setData([{ time: t0, value: 30 }, { time: t1, value: 30 }]);
+      // Reference lines need at least 2 distinct timestamps
+      if (candles.length >= 2) {
+        const t0 = toUnixET(candles[0].t);
+        const t1 = toUnixET(candles[candles.length - 1].t);
+        rsi70Series.setData([{ time: t0, value: 70 }, { time: t1, value: 70 }]);
+        rsi30Series.setData([{ time: t0, value: 30 }, { time: t1, value: 30 }]);
+      }
     }
 
     if (!fittedRef.current) {

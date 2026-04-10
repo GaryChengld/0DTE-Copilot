@@ -12,6 +12,7 @@ import newsRouter from "./routes/news.js";
 import newsKeywordsRouter from "./routes/newsKeywords.js";
 import marketSnapshotRouter from "./routes/marketSnapshot.js";
 import spxCandlesRouter from "./routes/spxCandles.js";
+import sectorEtfsRouter from "./routes/sectorEtfs.js";
 import { sendToAI } from "./services/aiSession.js";
 import { createAiAdvice } from "./db/ingestionRepository.js";
 
@@ -35,6 +36,7 @@ app.use("/api", newsRouter);
 app.use("/api", newsKeywordsRouter);
 app.use("/api", marketSnapshotRouter);
 app.use("/api", spxCandlesRouter);
+app.use("/api", sectorEtfsRouter);
 
 // Socket.io
 io.on("connection", (socket) => {

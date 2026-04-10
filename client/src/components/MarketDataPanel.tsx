@@ -1,7 +1,7 @@
 import SpxSummary from "./SpxSummary";
 import IndexTicker from "./IndexTicker";
 import SpxCandleChart from "./SpxCandleChart";
-import TradingViewHeatmap from "./TradingViewHeatmap";
+import EtfHeatmap from "./EtfHeatmap";
 import { useMarketSnapshot } from "../hooks/useMarketSnapshot";
 import { useSpxCandles } from "../hooks/useSpxCandles";
 
@@ -40,7 +40,7 @@ export default function MarketDataPanel() {
           className="h-full rounded-lg overflow-hidden"
           style={{ border: "1px solid var(--border)" }}
         >
-          <TradingViewHeatmap />
+          <EtfHeatmap />
         </div>
       </div>
     </aside>
