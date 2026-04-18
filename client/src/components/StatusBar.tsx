@@ -34,9 +34,11 @@ interface StatusBarProps {
   onOpenMarketSummary: () => void;
   indexesOpen: boolean;
   onToggleIndexes: () => void;
+  mode: "trading" | "review";
+  onSetMode: (mode: "trading" | "review") => void;
 }
 
-export default function StatusBar({ onOpenMarketSummary, indexesOpen, onToggleIndexes }: StatusBarProps) {
+export default function StatusBar({ onOpenMarketSummary, indexesOpen, onToggleIndexes, mode, onSetMode }: StatusBarProps) {
   const status = useStatus();
   const [clock, setClock] = useState(getETTime);
 
@@ -78,6 +80,22 @@ export default function StatusBar({ onOpenMarketSummary, indexesOpen, onToggleIn
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Mode toggle */}
+      <div className="flex items-center rounded overflow-hidden border text-xs font-medium mr-3" style={{ borderColor: "var(--border)" }}>
+        {(["trading", "review"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => onSetMode(m)}
+            className={`px-3 py-1 capitalize transition-colors ${
+              mode === m ? "bg-blue-600 text-white" : "hover:bg-white/10"
+            }`}
+            style={{ color: mode === m ? undefined : "var(--text-muted)" }}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
 
       {/* Right: statuses */}
       <div className="flex items-center gap-3">

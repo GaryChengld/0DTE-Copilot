@@ -45,7 +45,7 @@ server/    # Express backend — market data, AI session, Socket.io
     utils/            # Shared utilities (marketHours)
     generated/prisma/ # Auto-generated Prisma client (do not edit)
   prisma/
-    schema.prisma     # DB schema: AiAdvice, Trade, TradeExit, MarketSummary, OtherIndexSnapshot
+    schema.prisma     # DB schema: AiAdvice, Trade, TradeExit, MarketSummary, OtherIndexSnapshot, NewsKeyword, Journal
 ```
 
 ## Commands
@@ -91,6 +91,7 @@ npm run build            # build frontend for production
 | [20-news-keywords-api](.claude/tasks/20-news-keywords-api.md) | NewsKeyword table + GET/PUT /api/news/keywords — manage news filter keywords via DB | 2026-04-08 |
 | [21-spx-candles-api](.claude/tasks/21-spx-candles-api.md) | GET /api/spx/candles — all today's RTH 5-min SPX candles with per-candle VWAP | 2026-04-08 |
 | [22-sector-etf-api](.claude/tasks/22-sector-etf-api.md) | GET /api/etf/sectors — live price + % change for 11 S&P 500 sector ETFs | 2026-04-09 |
+| [23-journal-api](.claude/tasks/23-journal-api.md) | Journal table + CRUD APIs + AI advices by date + SPX historical candles by date | 2026-04-17 |
 
 ### Client
 
@@ -109,6 +110,7 @@ npm run build            # build frontend for production
 | [61-spx-candle-chart](.claude/tasks/61-spx-candle-chart.md) | Replace TradingView embed with lightweight-charts candlestick chart — SPX 5-min + VWAP + volume + RSI | 2026-04-08 |
 | [62-spx-heatmap](.claude/tasks/62-spx-heatmap.md) | Sector ETF heatmap — 11 S&P 500 sector ETFs in 2-column color-coded grid, 30s polling | 2026-04-09 |
 | [63-news-keywords-editor](.claude/tasks/63-news-keywords-editor.md) | News Keywords modal editor — inline editable list with add/delete, gear icon in News panel | 2026-04-09 |
+| [64-history-panel](.claude/tasks/64-history-panel.md) | History tab — calendar with journal highlights, SPX chart, AI advice log, journal editor | 2026-04-17 |
 
 ### Tools
 
@@ -123,7 +125,7 @@ npm run build            # build frontend for production
 |---|---|---|
 | GET | `/api/status` | Server uptime, DB connectivity, AI session state |
 | POST | `/api/chat` | Send user message to AI, persist and broadcast response |
-| GET | `/api/ai-advices` | Retrieve latest 3 AI advice records |
+| GET | `/api/ai-advices` | Retrieve latest 20 AI advice records (all sources) |
 | POST | `/api/ai-session/restart` | Manually restart AI session |
 | POST | `/api/ai/analyze` | Trigger on-demand AI analysis with live market data |
 | POST | `/api/ai/analyze/message` | Return analysis payload without sending to AI |
@@ -138,7 +140,13 @@ npm run build            # build frontend for production
 | PUT | `/api/news/keywords` | Replace news filter keyword list |
 | GET | `/api/market-snapshot` | SPX daily snapshot (price, O/H/L, change, RSI, ATR, MAs) + latest VIX/ADD/TICK |
 | GET | `/api/spx/candles` | All today's RTH 5-min SPX candles with VWAP and RSI |
+| GET | `/api/spx/candles?date=YYYY-MM-DD` | Historical SPX 5-min candles for a date + last 10 from previous trading day |
 | GET | `/api/etf/sectors` | Live price + % change for 11 S&P 500 sector ETFs |
+| PUT | `/api/journal` | Create or update journal entry for a date (upsert by date) |
+| DELETE | `/api/journal/:id` | Delete a journal entry by id |
+| GET | `/api/journal?date=YYYY-MM-DD` | Retrieve journal entry for a date |
+| GET | `/api/journal/months?year=Y&month=M` | List dates that have a journal entry in a given month |
+| GET | `/api/ai-advices?date=YYYY-MM-DD` | Retrieve all user-sourced AI advices for a date |
 
 ## Health Check
 
@@ -172,8 +180,10 @@ npm run build            # build frontend for production
 | `services/news.ts` | Fetches latest economic headlines from Finnhub API; keyword-filters using keywords from DB |
 | `db/newsKeywordsRepository.ts` | Stores and retrieves news filter keywords from `NewsKeyword` table |
 | `routes/marketSnapshot.ts` | `GET /api/market-snapshot` — SPX daily snapshot + latest VIX/ADD/TICK |
-| `routes/spxCandles.ts` | `GET /api/spx/candles` — today's RTH 5-min candles with VWAP + RSI |
+| `routes/spxCandles.ts` | `GET /api/spx/candles` — today's RTH 5-min candles with VWAP + RSI; `?date=` for historical |
 | `routes/sectorEtfs.ts` | `GET /api/etf/sectors` — 11 sector ETF prices and % change |
+| `routes/journal.ts` | Journal CRUD — PUT/DELETE/GET `/api/journal`, GET `/api/journal/months` |
+| `db/journalRepository.ts` | Upsert, delete, get by date, list dates by month for `Journal` table |
 | `tools/tv_feed.py` | Python polling script — fetches VIX/$ADD/$TICK from TradingView and POSTs to `/api/other_indexes` |
 | `tools/tv_export.py` | Python export script — downloads historical OHLCV candles from TradingView and computes RSI/SMA/EMA/ATR/MACD indicators into a CSV |
 

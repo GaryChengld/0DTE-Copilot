@@ -25,3 +25,16 @@ export async function createAiAdvice(params: {
 }): Promise<void> {
   await prisma.aiAdvice.create({ data: params });
 }
+
+/** Return all source="user" AI advices whose timestamp falls on the given date (ET). */
+export async function getAiAdvicesByDate(date: string) {
+  const start = new Date(`${date}T00:00:00`);
+  const end   = new Date(`${date}T23:59:59.999`);
+  return prisma.aiAdvice.findMany({
+    where: {
+      source: "user",
+      timestamp: { gte: start, lte: end },
+    },
+    orderBy: { timestamp: "asc" },
+  });
+}

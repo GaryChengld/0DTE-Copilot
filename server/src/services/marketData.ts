@@ -351,6 +351,84 @@ export async function fetchSpxCandles(): Promise<SpxCandle[]> {
   });
 }
 
+export async function fetchSpxCandlesByDate(date: string): Promise<SpxCandle[]> {
+  // Pull a wide window: 7 calendar days before → 1 day after the target date.
+  // This guarantees we capture the previous trading day even across weekends.
+  const targetDate = new Date(`${date}T00:00:00`);
+  const period1 = new Date(targetDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const period2 = new Date(targetDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+  const [spxResult, seedCloses] = await Promise.all([
+    yahooFinance.chart("^GSPC", { period1, period2, interval: "5m" as const }) as unknown as Promise<YFChartResult>,
+    fetchDailyCloses("^GSPC", 60),
+  ]);
+
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  const spxAll = ((spxResult.quotes ?? []).filter((q) =>
+    q.date != null && q.open != null && q.high != null &&
+    q.low != null && q.close != null && q.volume != null &&
+    q.volume > 0 && isRTHCandle(q.date)
+  ) as RTHCandle[]);
+
+  // Group by ET date
+  const byDate = new Map<string, RTHCandle[]>();
+  for (const c of spxAll) {
+    const d = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(c.date);
+    if (!byDate.has(d)) byDate.set(d, []);
+    byDate.get(d)!.push(c);
+  }
+
+  // Use the selected date if it has candles; otherwise fall back to the most recent trading day before it.
+  // Then take the last 80 candles ending at that effective date.
+  const sortedDates = [...byDate.keys()].sort();
+  const effectiveDate = sortedDates.filter((d) => d <= date).at(-1);
+
+  if (!effectiveDate) return [];
+
+  const allCandles: RTHCandle[] = [];
+  for (const d of sortedDates.filter((d) => d <= effectiveDate)) {
+    allCandles.push(...(byDate.get(d) ?? []));
+  }
+  const combined = allCandles.slice(-80);
+
+  // Seed RSI with daily closes then append intraday closes
+  const intradayCloses = combined.map((c) => c.close);
+  const rsiAll = RSI.calculate({ period: 14, values: [...seedCloses, ...intradayCloses] });
+  const rsiIntraday = rsiAll.slice(rsiAll.length - intradayCloses.length);
+
+  // VWAP resets at each trading day boundary
+  let cumTPV = 0;
+  let cumVol = 0;
+  let currentDateET = "";
+
+  return combined.map((c, i) => {
+    const candleDateET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(c.date);
+    if (candleDateET !== currentDateET) {
+      cumTPV = 0;
+      cumVol = 0;
+      currentDateET = candleDateET;
+    }
+    const tp = (c.high + c.low + c.close) / 3;
+    cumTPV += tp * c.volume;
+    cumVol += c.volume;
+    const vwap = cumVol > 0 ? r2(cumTPV / cumVol) : r2(c.close);
+    const rsi = rsiIntraday[i] != null ? r2(rsiIntraday[i]) : null;
+
+    return {
+      t: formatDateTimeET(c.date),
+      o: r2(c.open),
+      h: r2(c.high),
+      l: r2(c.low),
+      c: r2(c.close),
+      v: c.volume,
+      vwap,
+      rsi,
+      open: false,
+    };
+  });
+}
+
 // --- Sector ETF snapshots ---
 
 export interface SectorEtf {

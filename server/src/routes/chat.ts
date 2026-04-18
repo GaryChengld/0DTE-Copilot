@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { sendToAI, restartAISession, getAISessionState } from '../services/aiSession.js'
-import { createAiAdvice, getLatestAiAdvices } from '../db/ingestionRepository.js'
+import { createAiAdvice, getLatestAiAdvices, getAiAdvicesByDate } from '../db/ingestionRepository.js'
 import { config } from '../config.js'
 
 const router = Router()
@@ -20,9 +20,21 @@ router.post('/chat', async (req: Request, res: Response) => {
   res.json({ response })
 })
 
-router.get('/ai-advices', async (_req: Request, res: Response) => {
-  const advices = await getLatestAiAdvices(20)
-  res.json(advices)
+router.get('/ai-advices', async (req: Request, res: Response) => {
+  const { date } = req.query as { date?: string };
+
+  if (date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      res.status(400).json({ error: "date must be in YYYY-MM-DD format" });
+      return;
+    }
+    const advices = await getAiAdvicesByDate(date);
+    res.json(advices);
+    return;
+  }
+
+  const advices = await getLatestAiAdvices(20);
+  res.json(advices);
 })
 
 router.post('/ai-session/restart', async (_req: Request, res: Response) => {

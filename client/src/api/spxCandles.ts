@@ -16,3 +16,10 @@ export async function fetchSpxCandles(): Promise<SpxCandle[]> {
   const data = await res.json();
   return data.candles;
 }
+
+export async function fetchSpxCandlesByDate(date: string): Promise<SpxCandle[]> {
+  const res = await fetch(`/api/spx/candles?date=${date}`);
+  if (!res.ok) throw new Error(`spx/candles?date: ${res.status}`);
+  const data = await res.json();
+  return data.candles;
+}

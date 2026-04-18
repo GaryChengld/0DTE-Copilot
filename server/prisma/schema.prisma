@@ -58,6 +58,14 @@ model Trade {
 
 }
 
+model Journal {
+  id        Int      @id @default(autoincrement())
+  date      String   @unique  // "YYYY-MM-DD" — one entry per calendar day
+  journal   String             // markdown content
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model TradeExit {
   id           Int    @id @default(autoincrement())
   tradeId      Int
