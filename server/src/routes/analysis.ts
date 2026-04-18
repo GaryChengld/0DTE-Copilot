@@ -3,7 +3,7 @@ import type { Server } from 'socket.io'
 import { fetchMarketData } from '../services/marketData.js'
 import { sendToAI } from '../services/aiSession.js'
 import { createAiAdvice } from '../db/ingestionRepository.js'
-import { findOpenTrades } from '../db/tradeRepository.js'
+import { findOpenTrades, findTodayClosedTrades } from '../db/tradeRepository.js'
 import { getLatestMarketSummary } from '../db/marketSummaryRepository.js'
 import { getTodayOtherIndexSnapshots } from '../db/otherIndexesRepository.js'
 import { fetchLatestNews } from '../services/news.js'
@@ -22,9 +22,10 @@ function getTradeDateET(): string {
 
 async function buildAnalysisPayload(userNotes?: string) {
   const tradeDate = getTradeDateET()
-  const [marketData, openTrades, marketSummary, otherIndexSnapshots, newsItems] = await Promise.all([
+  const [marketData, openTrades, closedTrades, marketSummary, otherIndexSnapshots, newsItems] = await Promise.all([
     fetchMarketData(),
     findOpenTrades(),
+    findTodayClosedTrades(tradeDate),
     getLatestMarketSummary(),
     getTodayOtherIndexSnapshots(tradeDate),
     config.finnhubApiKey ? fetchLatestNews(10).catch(() => []) : Promise.resolve([]),
@@ -55,6 +56,7 @@ async function buildAnalysisPayload(userNotes?: string) {
     timestamp,
     market_data: marketDataPayload,
     open_positions: openTrades,
+    closed_positions: closedTrades,
   }
   if (newsItems.length > 0) {
     payload.news = newsItems.map((n) => ({ datetime: n.publishedAt, title: n.title }))

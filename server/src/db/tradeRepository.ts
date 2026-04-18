@@ -31,6 +31,14 @@ export async function findOpenTrades(): Promise<TradeWithExits[]> {
   });
 }
 
+export async function findTodayClosedTrades(tradeDate: string): Promise<TradeWithExits[]> {
+  return prisma.trade.findMany({
+    where: { tradeDate, status: "CLOSED" },
+    include: { exits: true },
+    orderBy: { id: "asc" },
+  });
+}
+
 export async function createTradeExit(data: {
   tradeId: number;
   tradeDate: string;

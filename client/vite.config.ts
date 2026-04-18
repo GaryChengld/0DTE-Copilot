@@ -6,9 +6,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd());
   const apiBaseUrl = env.VITE_API_BASE_URL;
 
+  const port = env.VITE_PORT ? parseInt(env.VITE_PORT, 10) : 5173;
+
   return {
     plugins: [react(), tailwindcss()],
     server: {
+      port,
       proxy: {
         "/api": apiBaseUrl,
         "/socket.io": {

@@ -47,6 +47,10 @@ SYMBOLS = [
 
 ET = ZoneInfo("America/New_York")
 
+# Seconds after each interval boundary to wake up.
+# TradingView needs a moment to publish the freshly closed bar; :10 is enough.
+WAKE_OFFSET_SECONDS = 10
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -61,29 +65,37 @@ def et_time_str() -> str:
 
 
 def sleep_until_next_interval(interval_minutes: int) -> None:
-    """Sleep until the next clock-aligned interval boundary."""
+    """Sleep until 10 seconds after the next clock-aligned interval boundary."""
     now = now_et()
     seconds_past_hour = now.minute * 60 + now.second + now.microsecond / 1_000_000
     interval_seconds = interval_minutes * 60
-    seconds_until_next = interval_seconds - (seconds_past_hour % interval_seconds)
-    print(f"  Sleeping {seconds_until_next:.0f}s until next :{now.minute // interval_minutes * interval_minutes + interval_minutes:02d}...")
+    seconds_until_next = interval_seconds - (seconds_past_hour % interval_seconds) + WAKE_OFFSET_SECONDS
+    next_minute = (now.minute // interval_minutes * interval_minutes + interval_minutes) % 60
+    print(f"  Sleeping {seconds_until_next:.0f}s until next :{next_minute:02d}:{WAKE_OFFSET_SECONDS:02d}...")
     time.sleep(seconds_until_next)
 
 
-def fetch_close(tv: TvDatafeed, symbol: str, exchange: str, interval: Interval) -> float:
-    """Fetch the latest bar and return its close value."""
-    df = tv.get_hist(symbol=symbol, exchange=exchange, interval=interval, n_bars=1)
+def fetch_close(tv: TvDatafeed, symbol: str, exchange: str) -> float:
+    """Fetch the latest 1-minute bar and return its close value.
+
+    Always use 1-minute bars regardless of poll interval so we get the most
+    recent reading (at most ~1 minute stale) rather than the last completed
+    N-minute bar which can lag by up to 2× the poll interval.
+    """
+    df = tv.get_hist(symbol=symbol, exchange=exchange, interval=Interval.in_1_minute, n_bars=2)
     if df is None or len(df) < 1:
         raise ValueError(f"Insufficient data for {symbol}")
+    # iloc[-1] is the currently forming bar — use it for the most current reading
+    # even if the candle hasn't closed yet.
     return float(df["close"].iloc[-1])
 
 
-def fetch_all(tv: TvDatafeed, interval: Interval) -> dict:
+def fetch_all(tv: TvDatafeed) -> dict:
     """Fetch VIX, ADD, TICK in parallel. Returns dict with available values."""
     results = {}
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
-            executor.submit(fetch_close, tv, symbol, exchange, interval): key
+            executor.submit(fetch_close, tv, symbol, exchange): key
             for key, symbol, exchange in SYMBOLS
         }
         for future in as_completed(futures):
@@ -146,7 +158,7 @@ def main():
 
     while True:
         try:
-            data = fetch_all(tv, interval)
+            data = fetch_all(tv)
             if not data:
                 print(f"  WARNING: no data fetched, skipping this interval")
             else:
