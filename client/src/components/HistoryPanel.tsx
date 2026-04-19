@@ -8,13 +8,17 @@ import JournalModal from "./JournalModal";
 import { fetchSpxCandlesByDate, type SpxCandle } from "../api/spxCandles";
 import {
   fetchJournalByDate,
-  fetchJournalDates,
   fetchAiAdvicesByDate,
   upsertJournal,
   deleteJournal,
   type JournalEntry,
   type AiAdviceEntry,
 } from "../api/journal";
+import {
+  getMonthlyPnl,
+  getTradesByDate,
+  type TradeWithExits,
+} from "../api/trades";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -37,6 +41,118 @@ function toETTime(iso: string): string {
 
 function ensureParagraphBreaks(text: string): string {
   return text.replace(/\n(\*\*[^*\n]+[：:]\*\*|\*\*[^*\n]+\*\*[：:])/g, "  \n$1");
+}
+
+function fmtPnl(pnl: number): string {
+  return (pnl >= 0 ? "+" : "") + pnl.toFixed(2);
+}
+
+// ── Sub-component: MonthlyPnlPanel ────────────────────────────────────────
+
+function MonthlyPnlPanel({ total }: { total: number | null }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
+        Monthly P&L
+      </span>
+      <span
+        className="text-base font-semibold"
+        style={{ color: total === null ? "var(--text-muted)" : total >= 0 ? "#4ade80" : "#f87171" }}
+      >
+        {total === null ? "—" : fmtPnl(total)}
+      </span>
+    </div>
+  );
+}
+
+// ── Sub-component: DailyTradesPanel ───────────────────────────────────────
+
+function DailyTradesPanel({ trades, loading }: { trades: TradeWithExits[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <p className="text-xs text-center py-3" style={{ color: "var(--text-muted)" }}>
+        Loading…
+      </p>
+    );
+  }
+  if (trades.length === 0) {
+    return (
+      <p className="text-xs text-center py-3" style={{ color: "var(--text-muted)" }}>
+        No trades on this date.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {trades.map((trade) => {
+        const totalPnl = trade.exits.reduce((sum, e) => sum + (e.pnl ?? 0), 0);
+        const hasPnl = trade.exits.some((e) => e.pnl != null);
+        return (
+          <div
+            key={trade.id}
+            className="rounded-lg px-3 py-2 flex flex-col gap-1"
+            style={{ background: "#1c2333" }}
+          >
+            {/* Trade header */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-white">
+                {trade.symbol} {trade.optionType ?? ""} {trade.strike ?? ""} ×{trade.quantityInitial}
+                <span
+                  className="ml-1.5 text-xs font-normal"
+                  style={{ color: trade.spreadType === "CREDIT" ? "#60a5fa" : "#f9a825" }}
+                >
+                  {trade.spreadType}
+                </span>
+              </span>
+              {hasPnl && (
+                <span
+                  className="text-xs font-semibold"
+                  style={{ color: totalPnl >= 0 ? "#4ade80" : "#f87171" }}
+                >
+                  {fmtPnl(totalPnl)}
+                </span>
+              )}
+            </div>
+            {/* Entry info */}
+            <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Entry {trade.entryPrice != null ? `$${trade.entryPrice.toFixed(2)}` : "—"}
+              {trade.entryTime ? ` @ ${trade.entryTime.slice(11, 16)}` : ""}
+              {" · "}
+              <span style={{ color: trade.status === "CLOSED" ? "var(--text-muted)" : "#60a5fa" }}>
+                {trade.status.toLowerCase().replace("_", " ")}
+              </span>
+            </div>
+            {/* Exits */}
+            {trade.exits.length > 0 && (
+              <div
+                className="flex flex-col gap-0.5 pt-1 border-t"
+                style={{ borderColor: "var(--border)" }}
+              >
+                {trade.exits.map((exit) => (
+                  <div
+                    key={exit.id}
+                    className="flex items-center justify-between text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <span>
+                      ×{exit.exitQuantity} @ ${exit.exitPrice.toFixed(2)} · {exit.exitReason}
+                      {exit.exitTime ? ` · ${exit.exitTime.slice(11, 16)}` : ""}
+                    </span>
+                    {exit.pnl != null && (
+                      <span style={{ color: exit.pnl >= 0 ? "#4ade80" : "#f87171" }}>
+                        {fmtPnl(exit.pnl)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Sub-component: AdvicesView ─────────────────────────────────────────────
@@ -132,19 +248,16 @@ function JournalView({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Rendered markdown */}
       <div className="prose prose-invert max-w-none text-sm">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
           {ensureParagraphBreaks(journal.journal)}
         </ReactMarkdown>
       </div>
 
-      {/* Updated timestamp */}
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
         Updated {toETTime(journal.updatedAt)}
       </p>
 
-      {/* Action row */}
       <div
         className="flex items-center gap-3 pt-3 border-t"
         style={{ borderColor: "var(--border)" }}
@@ -197,19 +310,25 @@ export default function HistoryPanel() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [calendarYear, setCalendarYear] = useState(() => parseInt(today.slice(0, 4)));
   const [calendarMonth, setCalendarMonth] = useState(() => parseInt(today.slice(5, 7)));
-  const [journalDates, setJournalDates] = useState<Set<string>>(new Set());
+  const [pnlByDate, setPnlByDate] = useState<Map<string, number>>(new Map());
+  const [monthlyTotal, setMonthlyTotal] = useState<number | null>(null);
   const [candles, setCandles] = useState<SpxCandle[]>([]);
   const [advices, setAdvices] = useState<AiAdviceEntry[]>([]);
   const [journal, setJournal] = useState<JournalEntry | null>(null);
+  const [trades, setTrades] = useState<TradeWithExits[]>([]);
   const [rightTab, setRightTab] = useState<RightTab>("advices");
   const [journalModalOpen, setJournalModalOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [dateLoading, setDateLoading] = useState(false);
 
-  // Fetch journal dates whenever the displayed month changes
+  // Fetch monthly P&L whenever the displayed month changes
   useEffect(() => {
-    fetchJournalDates(calendarYear, calendarMonth)
-      .then((dates) => setJournalDates(new Set(dates)))
+    getMonthlyPnl(calendarYear, calendarMonth)
+      .then((entries) => {
+        const map = new Map(entries.map((e) => [e.date, e.pnl]));
+        setPnlByDate(map);
+        setMonthlyTotal(entries.length > 0 ? entries.reduce((s, e) => s + e.pnl, 0) : null);
+      })
       .catch(() => {});
   }, [calendarYear, calendarMonth]);
 
@@ -219,16 +338,19 @@ export default function HistoryPanel() {
     setCandles([]);
     setAdvices([]);
     setJournal(null);
+    setTrades([]);
     setDeleteConfirm(false);
 
     Promise.all([
       fetchSpxCandlesByDate(selectedDate).catch(() => [] as SpxCandle[]),
       fetchAiAdvicesByDate(selectedDate).catch(() => [] as AiAdviceEntry[]),
       fetchJournalByDate(selectedDate).catch(() => null),
-    ]).then(([c, a, j]) => {
+      getTradesByDate(selectedDate).catch(() => [] as TradeWithExits[]),
+    ]).then(([c, a, j, t]) => {
       setCandles(c);
       setAdvices(a);
       setJournal(j);
+      setTrades(t);
       setDateLoading(false);
     });
   }, [selectedDate]);
@@ -236,7 +358,6 @@ export default function HistoryPanel() {
   function handleMonthChange(year: number, month: number) {
     setCalendarYear(year);
     setCalendarMonth(month);
-    // Move selectedDate to the first of the new month so the calendar stays in sync
     const newSelected = `${year}-${String(month).padStart(2, "0")}-01`;
     setSelectedDate(newSelected);
   }
@@ -249,7 +370,6 @@ export default function HistoryPanel() {
   async function handleSaveJournal(content: string) {
     const entry = await upsertJournal(selectedDate, content);
     setJournal(entry);
-    setJournalDates((prev) => new Set([...prev, selectedDate]));
     setJournalModalOpen(false);
   }
 
@@ -257,33 +377,33 @@ export default function HistoryPanel() {
     if (!journal) return;
     await deleteJournal(journal.id);
     setJournal(null);
-    setJournalDates((prev) => {
-      const s = new Set(prev);
-      s.delete(selectedDate);
-      return s;
-    });
     setDeleteConfirm(false);
   }
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* ── Left column (35%) ───────────────────────────── */}
+      {/* ── Left column (25%) ───────────────────────────── */}
       <div
         className="w-[25%] flex flex-col shrink-0 overflow-hidden border-r"
         style={{ borderColor: "var(--border)" }}
       >
+        {/* Monthly PNL summary */}
+        <div className="shrink-0 px-4 py-3 rounded-lg mx-2 mt-2" style={{ background: "#1c2333" }}>
+          <MonthlyPnlPanel total={monthlyTotal} />
+        </div>
+
         {/* Calendar */}
-        <div className="shrink-0 p-3">
+        <div className="shrink-0 p-3 rounded-lg m-2" style={{ background: "#1c2333" }}>
           <HistoryCalendar
             selectedDate={selectedDate}
-            journalDates={journalDates}
+            pnlByDate={pnlByDate}
             onSelectDate={handleSelectDate}
             onMonthChange={handleMonthChange}
           />
         </div>
 
-        {/* SPX Chart — h-[45%] shrink-0 matches left panel proportions */}
-        <div className="h-[45%] shrink-0 p-2">
+        {/* SPX Chart */}
+        <div className="h-[40%] shrink-0 p-2">
           <div
             className="h-full rounded-lg overflow-hidden"
             style={{ border: "1px solid var(--border)" }}
@@ -291,9 +411,17 @@ export default function HistoryPanel() {
             <SpxCandleChart key={selectedDate} candles={candles} />
           </div>
         </div>
+
+        {/* Daily trade details */}
+        <div className="flex-1 overflow-y-auto p-2">
+          <p className="text-xs font-medium mb-1 px-1" style={{ color: "var(--text-muted)" }}>
+            Trades
+          </p>
+          <DailyTradesPanel trades={trades} loading={dateLoading} />
+        </div>
       </div>
 
-      {/* ── Right column (65%) ──────────────────────────── */}
+      {/* ── Right column (75%) ──────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Right tab bar */}
         <div

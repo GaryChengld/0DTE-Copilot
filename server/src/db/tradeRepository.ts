@@ -69,3 +69,41 @@ export async function deleteTrade(id: number): Promise<number> {
   await prisma.trade.delete({ where: { id } });
   return count;
 }
+
+export interface DailyPnl {
+  date: string;
+  pnl: number;
+}
+
+/** Aggregate daily P&L for a given year+month from TradeExit records. */
+export async function getMonthlyPnl(year: number, month: number): Promise<DailyPnl[]> {
+  const prefix = `${year}-${String(month).padStart(2, "0")}`;
+  const exits = await prisma.tradeExit.findMany({
+    where: { tradeDate: { startsWith: prefix } },
+    select: { tradeDate: true, pnl: true },
+    orderBy: { tradeDate: "asc" },
+  });
+
+  const byDate = new Map<string, number>();
+  for (const exit of exits) {
+    byDate.set(exit.tradeDate, (byDate.get(exit.tradeDate) ?? 0) + (exit.pnl ?? 0));
+  }
+
+  return [...byDate.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, pnl]) => ({ date, pnl }));
+}
+
+/** Return all trades opened or exited on a given date, with their full exits array. */
+export async function findTradesByDate(date: string): Promise<TradeWithExits[]> {
+  return prisma.trade.findMany({
+    where: {
+      OR: [
+        { tradeDate: date },
+        { exits: { some: { tradeDate: date } } },
+      ],
+    },
+    include: { exits: true },
+    orderBy: { id: "asc" },
+  });
+}

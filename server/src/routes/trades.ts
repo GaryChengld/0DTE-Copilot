@@ -6,6 +6,8 @@ import {
   createTradeExit,
   updateTradeAfterExit,
   deleteTrade,
+  getMonthlyPnl,
+  findTradesByDate,
 } from "../db/tradeRepository.js";
 const router = Router();
 
@@ -13,6 +15,48 @@ function getMarketDate(isoString?: string): string {
   const date = isoString ? new Date(isoString) : new Date();
   return date.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 }
+
+/** Current datetime as "YYYY-MM-DDTHH:mm:ss" in ET — no UTC offset suffix. */
+function nowET(): string {
+  return new Date().toLocaleString("sv-SE", { timeZone: "America/New_York" }).replace(" ", "T");
+}
+
+router.get("/trades/pnl", async (req: Request, res: Response) => {
+  const year = parseInt(req.query.year as string, 10);
+  const month = parseInt(req.query.month as string, 10);
+  if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+    res.status(400).json({ error: "year and month (1–12) query parameters are required" });
+    return;
+  }
+  try {
+    const pnl = await getMonthlyPnl(year, month);
+    res.json({ pnl });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[GET /trades/pnl] error:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.get("/trades", async (req: Request, res: Response) => {
+  const { date } = req.query as { date?: string };
+  if (!date) {
+    res.status(400).json({ error: "date query parameter is required" });
+    return;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.status(400).json({ error: "date must be in YYYY-MM-DD format" });
+    return;
+  }
+  try {
+    const trades = await findTradesByDate(date);
+    res.json({ trades });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[GET /trades] error:", message);
+    res.status(500).json({ error: message });
+  }
+});
 
 router.get("/trades/open", async (_req: Request, res: Response) => {
   const trades = await findOpenTrades();
@@ -60,7 +104,7 @@ router.post("/trades", async (req: Request, res: Response) => {
     quantityInitial: quantity,
     quantityRemaining: quantity,
     entryPrice,
-    entryTime: entryTime ?? new Date().toISOString(),
+    entryTime: entryTime ?? nowET(),
   });
 
   res.status(201).json({
@@ -110,7 +154,7 @@ router.post("/trades/exits", async (req: Request, res: Response) => {
     tradeDate: trade.tradeDate,
     exitQuantity,
     exitPrice,
-    exitTime: exitTime ?? new Date().toISOString(),
+    exitTime: exitTime ?? nowET(),
     exitReason,
     pnl,
   });

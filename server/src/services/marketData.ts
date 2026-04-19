@@ -458,16 +458,10 @@ export async function fetchSectorEtfs(): Promise<SectorEtf[]> {
 
   return Promise.all(
     SECTOR_ETFS.map(async ({ symbol, name }) => {
-      const result = (await yahooFinance.chart(symbol, {
-        period1: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        interval: "1d" as const,
-      })) as unknown as YFChartResult;
-
-      const price = r2(result.meta.regularMarketPrice ?? 0);
-      const prevClose = result.meta.chartPreviousClose ?? price;
-      const change = r2(price - prevClose);
-      const changePct = prevClose !== 0 ? r2((change / prevClose) * 100) : 0;
-
+      const quote = await yahooFinance.quote(symbol);
+      const price     = r2(quote.regularMarketPrice      ?? 0);
+      const change    = r2(quote.regularMarketChange     ?? 0);
+      const changePct = r2(quote.regularMarketChangePercent ?? 0);
       return { symbol, name, price, change, changePct };
     })
   );
@@ -493,22 +487,22 @@ export interface SpxDailySnapshot {
 }
 
 export async function fetchSpxDailySnapshot(): Promise<SpxDailySnapshot> {
-  const [{ candles, meta }, dailyCloses, dailyCandles] = await Promise.all([
+  const [{ candles, meta }, dailyCloses, dailyCandles, spxQuote] = await Promise.all([
     fetchTodayRTHCandles("^GSPC"),
     fetchDailyCloses("^GSPC", 300),
     fetchDailyCandles("^GSPC", 60),
+    yahooFinance.quote("^GSPC"),
   ]);
 
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const hasCandles = candles.length > 0;
 
   const price = r2(meta.regularMarketPrice ?? (hasCandles ? candles[candles.length - 1].close : 0));
-  const o = r2(hasCandles ? candles[0].open : (meta.regularMarketOpen ?? 0));
+  const o = r2(hasCandles ? candles[0].open : (spxQuote.regularMarketOpen ?? meta.regularMarketOpen ?? 0));
   const h = r2(hasCandles ? Math.max(...candles.map((c) => c.high)) : (meta.regularMarketDayHigh ?? 0));
   const l = r2(hasCandles ? Math.min(...candles.map((c) => c.low)) : (meta.regularMarketDayLow ?? 0));
-  const prevClose = meta.chartPreviousClose ?? o;
-  const change = r2(price - prevClose);
-  const changePct = prevClose !== 0 ? r2((change / prevClose) * 100) : 0;
+  const change    = r2(spxQuote.regularMarketChange        ?? 0);
+  const changePct = r2(spxQuote.regularMarketChangePercent ?? 0);
 
   return {
     price, o, h, l, change, changePct,

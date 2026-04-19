@@ -25,7 +25,7 @@ client/    # React frontend — single-page trading dashboard
     components/       # UI components (StatusBar, ConversationPanel, etc.)
     hooks/            # useSocket, useStatus, useTrades
     api/              # fetch wrappers per domain (chat, trades, analysis, etc.)
-    App.tsx           # Root layout
+    App.tsx           # Root layout — Trading/Review mode toggle; all panels stay mounted (hidden via CSS) to preserve scroll/state across switches
     main.tsx          # Vite entry point
   vite.config.ts      # Vite + Tailwind + proxy to backend
 
@@ -92,6 +92,7 @@ npm run build            # build frontend for production
 | [21-spx-candles-api](.claude/tasks/21-spx-candles-api.md) | GET /api/spx/candles — all today's RTH 5-min SPX candles with per-candle VWAP | 2026-04-08 |
 | [22-sector-etf-api](.claude/tasks/22-sector-etf-api.md) | GET /api/etf/sectors — live price + % change for 11 S&P 500 sector ETFs | 2026-04-09 |
 | [23-journal-api](.claude/tasks/23-journal-api.md) | Journal table + CRUD APIs + AI advices by date + SPX historical candles by date | 2026-04-17 |
+| [24-trade-history-apis](.claude/tasks/24-trade-history-apis.md) | Monthly PNL aggregation + trades-by-date query APIs | 2026-04-18 |
 
 ### Client
 
@@ -110,7 +111,8 @@ npm run build            # build frontend for production
 | [61-spx-candle-chart](.claude/tasks/61-spx-candle-chart.md) | Replace TradingView embed with lightweight-charts candlestick chart — SPX 5-min + VWAP + volume + RSI | 2026-04-08 |
 | [62-spx-heatmap](.claude/tasks/62-spx-heatmap.md) | Sector ETF heatmap — 11 S&P 500 sector ETFs in 2-column color-coded grid, 30s polling | 2026-04-09 |
 | [63-news-keywords-editor](.claude/tasks/63-news-keywords-editor.md) | News Keywords modal editor — inline editable list with add/delete, gear icon in News panel | 2026-04-09 |
-| [64-history-panel](.claude/tasks/64-history-panel.md) | History tab — calendar with journal highlights, SPX chart, AI advice log, journal editor | 2026-04-17 |
+| [64-history-panel](.claude/tasks/64-history-panel.md) | Trading/Review mode toggle — Review mode replaces left+middle panels with calendar, SPX chart, AI advice log, and journal editor | 2026-04-18 |
+| [65-review-mode-pnl](.claude/tasks/65-review-mode-pnl.md) | Review mode left panel: monthly P&L total, P&L-colored calendar highlights, daily trade details below chart | 2026-04-18 |
 
 ### Tools
 
@@ -140,13 +142,15 @@ npm run build            # build frontend for production
 | PUT | `/api/news/keywords` | Replace news filter keyword list |
 | GET | `/api/market-snapshot` | SPX daily snapshot (price, O/H/L, change, RSI, ATR, MAs) + latest VIX/ADD/TICK |
 | GET | `/api/spx/candles` | All today's RTH 5-min SPX candles with VWAP and RSI |
-| GET | `/api/spx/candles?date=YYYY-MM-DD` | Historical SPX 5-min candles for a date + last 10 from previous trading day |
+| GET | `/api/spx/candles?date=YYYY-MM-DD` | Historical SPX 5-min candles — last 80 RTH candles ending at the nearest trading day on or before the date |
 | GET | `/api/etf/sectors` | Live price + % change for 11 S&P 500 sector ETFs |
 | PUT | `/api/journal` | Create or update journal entry for a date (upsert by date) |
 | DELETE | `/api/journal/:id` | Delete a journal entry by id |
 | GET | `/api/journal?date=YYYY-MM-DD` | Retrieve journal entry for a date |
 | GET | `/api/journal/months?year=Y&month=M` | List dates that have a journal entry in a given month |
 | GET | `/api/ai-advices?date=YYYY-MM-DD` | Retrieve all user-sourced AI advices for a date |
+| GET | `/api/trades/pnl?year=Y&month=M` | Daily P&L totals for a given month (one entry per day with exits) |
+| GET | `/api/trades?date=YYYY-MM-DD` | All trades opened or exited on a given date, with full exits |
 
 ## Health Check
 
@@ -156,6 +160,15 @@ npm run build            # build frontend for production
 ```
 
 ## Architecture
+
+### Application Modes
+
+The UI has two modes toggled by **Trading / Review** buttons in the status bar. All panels stay mounted at all times (hidden via CSS `display: none`) to preserve scroll position and state across switches.
+
+| Mode | Left panel | Middle panel | Right sidebar |
+|---|---|---|---|
+| **Trading** | `MarketDataPanel` — live SPX chart, snapshot, heatmap | AI Conversation + Preview Prompt tabs + ChatInputBar | News / Positions |
+| **Review** | `HistoryPanel` left — monthly P&L total, calendar (P&L-colored), SPX chart, daily trade details | `HistoryPanel` right — AI Advice log + Journal editor | News / Positions |
 
 ### Core Trading Logic (hierarchical, order matters)
 
@@ -180,10 +193,12 @@ npm run build            # build frontend for production
 | `services/news.ts` | Fetches latest economic headlines from Finnhub API; keyword-filters using keywords from DB |
 | `db/newsKeywordsRepository.ts` | Stores and retrieves news filter keywords from `NewsKeyword` table |
 | `routes/marketSnapshot.ts` | `GET /api/market-snapshot` — SPX daily snapshot + latest VIX/ADD/TICK |
-| `routes/spxCandles.ts` | `GET /api/spx/candles` — today's RTH 5-min candles with VWAP + RSI; `?date=` for historical |
+| `routes/spxCandles.ts` | `GET /api/spx/candles` — today's RTH 5-min candles with VWAP + RSI; `?date=` returns last 80 RTH candles ending at nearest trading day |
 | `routes/sectorEtfs.ts` | `GET /api/etf/sectors` — 11 sector ETF prices and % change |
 | `routes/journal.ts` | Journal CRUD — PUT/DELETE/GET `/api/journal`, GET `/api/journal/months` |
 | `db/journalRepository.ts` | Upsert, delete, get by date, list dates by month for `Journal` table |
+| `routes/trades.ts` | Trade CRUD + exits + `GET /api/trades?date=` + `GET /api/trades/pnl?year=&month=`; `entryTime`/`exitTime` default to ET local time string |
+| `db/tradeRepository.ts` | Trade + TradeExit queries; `getMonthlyPnl` aggregates daily P&L from exits; `findTradesByDate` matches trades opened or exited on a date |
 | `tools/tv_feed.py` | Python polling script — fetches VIX/$ADD/$TICK from TradingView and POSTs to `/api/other_indexes` |
 | `tools/tv_export.py` | Python export script — downloads historical OHLCV candles from TradingView and computes RSI/SMA/EMA/ATR/MACD indicators into a CSV |
 

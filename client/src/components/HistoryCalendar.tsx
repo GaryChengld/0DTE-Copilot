@@ -1,8 +1,8 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface HistoryCalendarProps {
-  selectedDate: string;       // "YYYY-MM-DD"
-  journalDates: Set<string>;  // dates with a journal entry
+  selectedDate: string;           // "YYYY-MM-DD"
+  pnlByDate: Map<string, number>; // date → pnl (positive = profit, negative = loss)
   onSelectDate: (date: string) => void;
   onMonthChange: (year: number, month: number) => void;
 }
@@ -28,7 +28,7 @@ function todayET(): string {
 
 export default function HistoryCalendar({
   selectedDate,
-  journalDates,
+  pnlByDate,
   onSelectDate,
   onMonthChange,
 }: HistoryCalendarProps) {
@@ -104,12 +104,16 @@ export default function HistoryCalendar({
 
           const dateStr = toDateStr(displayYear, displayMonth, day);
           const isSelected = dateStr === selectedDate;
-          const hasJournal = journalDates.has(dateStr);
           const isToday = dateStr === today;
 
-          // Journal status (green) is always visible; selection adds a blue ring on top.
-          const bgClass = hasJournal
+          const pnl = pnlByDate.get(dateStr);
+          const isProfit = pnl !== undefined && pnl > 0;
+          const isLoss = pnl !== undefined && pnl < 0;
+
+          const bgClass = isProfit
             ? "bg-green-800 text-green-100"
+            : isLoss
+            ? "bg-red-900 text-red-100"
             : isSelected
             ? "bg-blue-600 text-white"
             : "";

@@ -5,8 +5,19 @@ import {
   LineSeries,
   HistogramSeries,
   type IChartApi,
+  type ISeriesApi,
+  type UTCTimestamp,
 } from "lightweight-charts";
 import type { SpxCandle } from "../api/spxCandles";
+
+interface ChartSeries {
+  candleSeries: ISeriesApi<"Candlestick">;
+  vwapSeries: ISeriesApi<"Line">;
+  volSeries: ISeriesApi<"Histogram">;
+  rsiSeries: ISeriesApi<"Line">;
+  rsi70Series: ISeriesApi<"Line">;
+  rsi30Series: ISeriesApi<"Line">;
+}
 
 interface SpxCandleChartProps {
   candles: SpxCandle[];
@@ -15,14 +26,15 @@ interface SpxCandleChartProps {
 // Convert "YYYY-MM-DDTHH:mm" ET string to Unix seconds.
 // We treat the ET datetime as UTC ("fake UTC") so the chart displays correct ET labels
 // without any timezone offset — lightweight-charts displays timestamps in UTC by default.
-function toUnixET(timeStr: string): number {
-  return Math.floor(new Date(`${timeStr}:00Z`).getTime() / 1000);
+function toUnixET(timeStr: string): UTCTimestamp {
+  return Math.floor(new Date(`${timeStr}:00Z`).getTime() / 1000) as UTCTimestamp;
 }
 
 
 export default function SpxCandleChart({ candles }: SpxCandleChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ChartSeries | null>(null);
   const fittedRef = useRef(false);
 
   useEffect(() => {
@@ -136,11 +148,12 @@ export default function SpxCandleChart({ candles }: SpxCandleChartProps) {
       });
     });
 
-    (chart as any).__series = { candleSeries, vwapSeries, volSeries, rsiSeries, rsi70Series, rsi30Series };
+    seriesRef.current = { candleSeries, vwapSeries, volSeries, rsiSeries, rsi70Series, rsi30Series };
 
     return () => {
       chart.remove();
       chartRef.current = null;
+      seriesRef.current = null;
       fittedRef.current = false;
     };
   }, []);
@@ -148,10 +161,9 @@ export default function SpxCandleChart({ candles }: SpxCandleChartProps) {
   // Update data when candles change
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || candles.length === 0) return;
+    if (!chart || !seriesRef.current || candles.length === 0) return;
 
-    const { candleSeries, vwapSeries, volSeries, rsiSeries, rsi70Series, rsi30Series } =
-      (chart as any).__series;
+    const { candleSeries, vwapSeries, volSeries, rsiSeries, rsi70Series, rsi30Series } = seriesRef.current;
 
     candleSeries.setData(candles.map((c) => ({
       time: toUnixET(c.t),

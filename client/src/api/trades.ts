@@ -6,6 +6,38 @@ export interface TradeExit {
   exitTime: string | null;
 }
 
+export interface DailyPnl {
+  date: string;  // "YYYY-MM-DD"
+  pnl: number;
+}
+
+export interface TradeExitFull {
+  id: number;
+  tradeId: number;
+  tradeDate: string;
+  exitQuantity: number;
+  exitPrice: number;
+  exitTime: string;
+  exitReason: string;
+  pnl: number | null;
+}
+
+export interface TradeWithExits {
+  id: number;
+  tradeDate: string;
+  status: string;
+  symbol: string;
+  tradeType: string;
+  spreadType: string;
+  optionType: string | null;
+  strike: string | null;
+  quantityInitial: number;
+  quantityRemaining: number;
+  entryPrice: number | null;
+  entryTime: string | null;
+  exits: TradeExitFull[];
+}
+
 export interface Trade {
   id: number;
   tradeDate: string;
@@ -69,4 +101,18 @@ export async function exitTrade(data: ExitTradeRequest): Promise<TradeExit> {
 
 export async function deleteTrade(id: number): Promise<void> {
   await fetch(`/api/trades/${id}`, { method: "DELETE" });
+}
+
+export async function getMonthlyPnl(year: number, month: number): Promise<DailyPnl[]> {
+  const res = await fetch(`/api/trades/pnl?year=${year}&month=${month}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return data.pnl;
+}
+
+export async function getTradesByDate(date: string): Promise<TradeWithExits[]> {
+  const res = await fetch(`/api/trades?date=${date}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return data.trades;
 }
