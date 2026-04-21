@@ -450,23 +450,21 @@ export default function HistoryPanel() {
           </span>
         </div>
 
-        {/* Right content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {rightTab === "advices" && (
-            <AdvicesView advices={advices} loading={dateLoading} />
-          )}
-          {rightTab === "journal" && (
-            <JournalView
-              journal={journal}
-              loading={dateLoading}
-              deleteConfirm={deleteConfirm}
-              onNew={() => setJournalModalOpen(true)}
-              onEdit={() => setJournalModalOpen(true)}
-              onDeleteRequest={() => setDeleteConfirm(true)}
-              onDeleteCancel={() => setDeleteConfirm(false)}
-              onDeleteConfirm={handleDeleteJournal}
-            />
-          )}
+        {/* Right content — each tab gets its own scroll container so positions are independent */}
+        <div className="flex-1 overflow-y-auto p-4" style={{ display: rightTab === "advices" ? undefined : "none" }}>
+          <AdvicesView advices={advices} loading={dateLoading} />
+        </div>
+        <div className="flex-1 overflow-y-auto p-4" style={{ display: rightTab === "journal" ? undefined : "none" }}>
+          <JournalView
+            journal={journal}
+            loading={dateLoading}
+            deleteConfirm={deleteConfirm}
+            onNew={() => setJournalModalOpen(true)}
+            onEdit={() => setJournalModalOpen(true)}
+            onDeleteRequest={() => setDeleteConfirm(true)}
+            onDeleteCancel={() => setDeleteConfirm(false)}
+            onDeleteConfirm={handleDeleteJournal}
+          />
         </div>
       </div>
 
