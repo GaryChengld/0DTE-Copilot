@@ -113,6 +113,7 @@ npm run build            # build frontend for production
 | [63-news-keywords-editor](.claude/tasks/63-news-keywords-editor.md) | News Keywords modal editor — inline editable list with add/delete, gear icon in News panel | 2026-04-09 |
 | [64-history-panel](.claude/tasks/64-history-panel.md) | Trading/Review mode toggle — Review mode replaces left+middle panels with calendar, SPX chart, AI advice log, and journal editor | 2026-04-18 |
 | [65-review-mode-pnl](.claude/tasks/65-review-mode-pnl.md) | Review mode left panel: monthly P&L total, P&L-colored calendar highlights, daily trade details below chart | 2026-04-18 |
+| [66-replay-tab](.claude/tasks/66-replay-tab.md) | Review mode right panel: Replay tab generates historical AI analysis payload for selected date | 2026-05-16 |
 
 ### Tools
 
@@ -151,6 +152,7 @@ npm run build            # build frontend for production
 | GET | `/api/ai-advices?date=YYYY-MM-DD` | Retrieve all user-sourced AI advices for a date |
 | GET | `/api/trades/pnl?year=Y&month=M` | Daily P&L totals for a given month (one entry per day with exits) |
 | GET | `/api/trades?date=YYYY-MM-DD` | All trades opened or exited on a given date, with full exits |
+| GET | `/api/ai/replay/message?date=YYYY-MM-DD` | Historical analysis payload for a past date (no news/15m; all-day 5m candles with per-candle VWAP; daily_stats from Yahoo Finance historical data; market_summary for that date) |
 
 ## Health Check
 
@@ -168,7 +170,7 @@ The UI has two modes toggled by **Trading / Review** buttons in the status bar. 
 | Mode | Left panel | Middle panel | Right sidebar |
 |---|---|---|---|
 | **Trading** | `MarketDataPanel` — live SPX chart, snapshot, heatmap | AI Conversation + Preview Prompt tabs + ChatInputBar | News / Positions |
-| **Review** | `HistoryPanel` left — monthly P&L total, calendar (P&L-colored), SPX chart, daily trade details | `HistoryPanel` right — AI Advice log + Journal editor | News / Positions |
+| **Review** | `HistoryPanel` left — monthly P&L total, calendar (P&L-colored), SPX chart, daily trade details | `HistoryPanel` right — AI Advice log + Journal editor + Replay prompt | News / Positions |
 
 ### Core Trading Logic (hierarchical, order matters)
 
@@ -186,7 +188,7 @@ The UI has two modes toggled by **Trading / Review** buttons in the status bar. 
 | `services/marketData.ts` | Fetches today's 5-min RTH candles (SPX, SPY) + 300 days daily closes; builds 15m aggregation, last-6 5m candles, VWAP, RSI, MAs |
 | `services/aiSession.ts` | Lazy-initialized LLM session; send + background restart after analysis; session summary on restart |
 | `routes/analysis.ts` | Builds analysis payload and sends to AI (`/api/ai/analyze`) or returns it (`/api/ai/analyze/message`) |
-| `db/marketSummaryRepository.ts` | Stores and retrieves user-supplied market context (GEX, options data) |
+| `db/marketSummaryRepository.ts` | Stores and retrieves user-supplied market context (GEX, options data); `getMarketSummaryByDate` filters by ET day UTC range |
 | `db/otherIndexesRepository.ts` | Upserts and retrieves today's intraday VIX/ADD/TICK snapshots by `tradeDate` + `time` |
 | `utils/marketHours.ts` | Helper to check if current time is within RTH (Mon–Fri 09:30–16:00 ET) |
 | Socket.io layer | Broadcasts AI responses to frontend via `chat:response` event |
@@ -199,6 +201,7 @@ The UI has two modes toggled by **Trading / Review** buttons in the status bar. 
 | `db/journalRepository.ts` | Upsert, delete, get by date, list dates by month for `Journal` table |
 | `routes/trades.ts` | Trade CRUD + exits + `GET /api/trades?date=` + `GET /api/trades/pnl?year=&month=`; `entryTime`/`exitTime` default to ET local time string |
 | `db/tradeRepository.ts` | Trade + TradeExit queries; `getMonthlyPnl` aggregates daily P&L from exits; `findTradesByDate` matches trades opened or exited on a date |
+| `routes/replay.ts` | `GET /api/ai/replay/message?date=` — historical analysis payload for Review mode Replay tab |
 | `tools/tv_feed.py` | Python polling script — fetches VIX/$ADD/$TICK from TradingView and POSTs to `/api/other_indexes` |
 | `tools/tv_export.py` | Python export script — downloads historical OHLCV candles from TradingView and computes RSI/SMA/EMA/ATR/MACD indicators into a CSV |
 
@@ -235,6 +238,34 @@ When analysis is triggered, the following JSON is sent to AI:
 - `market_data.other_indexes_history`: today's VIX/ADD/TICK readings from `POST /api/other_indexes`; null fields omitted per entry; omitted when empty
 - `market_summary`: latest record from `POST /api/market-summary` (omitted if none)
 - `user_notes`: optional field from request body (omitted if not provided)
+
+### Replay Payload
+
+`GET /api/ai/replay/message?date=YYYY-MM-DD` returns a historical equivalent of the analysis payload for use in the Review mode Replay tab:
+
+```json
+{
+  "timestamp": "YYYY-MM-DD 16:00 ET",
+  "market_data": {
+    "spx": {
+      "daily_stats": { "price": 0, "o": 0, "h": 0, "l": 0, "vwap": 0, "rsi": 0, "ma": { "5": 0, "20": 0, "50": 0, "100": 0, "200": 0 } },
+      "candles_5m": [{ "t": "09:30", "o": 0, "h": 0, "l": 0, "c": 0, "v": 0, "vwap": 0 }]
+    },
+    "spy": { "daily_stats": { ... } },
+    "other_indexes_history": [{ "time": "09:35", "vix": 18.5, "add": -320, "tick": -280 }]
+  },
+  "positions": [],
+  "market_summary": { ... }
+}
+```
+
+Key differences from the live analysis payload:
+- `timestamp` fixed at `16:00 ET` for the selected date
+- `candles_5m` contains **all RTH 5-min candles** for that day (not just last 6), each with a per-candle cumulative `vwap`
+- `daily_stats` appears **before** `candles_5m`; OHLC/price sourced from Yahoo Finance 1d data (reliable for any date); RSI/MAs from historically-bounded daily closes
+- No `candles_15m`, no `news`
+- `market_summary` is the last record saved on that specific date (filtered by ET day UTC range); omitted if none
+- `positions` = all trades opened or exited on that date (via `findTradesByDate`)
 
 ### AI Session Behaviour
 
