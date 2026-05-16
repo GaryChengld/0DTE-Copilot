@@ -315,13 +315,20 @@ export async function fetchSpxReplayData(date: string): Promise<{ candles_5m: Ca
   const period1 = new Date(targetDate.getTime() - 24 * 60 * 60 * 1000);
   const period2 = new Date(targetDate.getTime() + 2 * 24 * 60 * 60 * 1000);
 
-  const [spxResult, spyResult, dailyCloses] = await Promise.all([
+  const [spxResult, spyResult, dailyCloses, dailyResult] = await Promise.all([
     yahooFinance.chart("^GSPC", { period1, period2, interval: "5m" as const }) as unknown as Promise<YFChartResult>,
     yahooFinance.chart("SPY",   { period1, period2, interval: "5m" as const }) as unknown as Promise<YFChartResult>,
     fetchDailyClosesUpTo("^GSPC", 300, targetDate),
+    yahooFinance.chart("^GSPC", { period1: targetDate, period2, interval: "1d" as const }) as unknown as Promise<YFChartResult>,
   ]);
 
   const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  // 1d candle for the target date — reliable OHLC even when 5-min data is unavailable
+  const dayCandle = (dailyResult.quotes ?? []).find((q) => {
+    if (!q.date || q.open == null || q.high == null || q.low == null || q.close == null) return false;
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(q.date) === date;
+  });
 
   const filterDay = (quotes: YFQuote[]): RTHCandle[] =>
     (quotes ?? []).filter((q) => {
@@ -357,12 +364,13 @@ export async function fetchSpxReplayData(date: string): Promise<{ candles_5m: Ca
     v: c.volume,
   }));
 
-  const hasCandles = merged.length > 0;
+  // Prefer 1d candle for OHLC/price (goes back years); fall back to intraday aggregates
+  const hasIntraday = merged.length > 0;
   const daily_stats: DailyStats = {
-    price: hasCandles ? r2(merged[merged.length - 1].close) : 0,
-    o:     hasCandles ? r2(merged[0].open) : 0,
-    h:     hasCandles ? r2(Math.max(...merged.map((c) => c.high))) : 0,
-    l:     hasCandles ? r2(Math.min(...merged.map((c) => c.low)))  : 0,
+    price: r2(dayCandle?.close  ?? (hasIntraday ? merged[merged.length - 1].close : 0)),
+    o:     r2(dayCandle?.open   ?? (hasIntraday ? merged[0].open : 0)),
+    h:     r2(dayCandle?.high   ?? (hasIntraday ? Math.max(...merged.map((c) => c.high)) : 0)),
+    l:     r2(dayCandle?.low    ?? (hasIntraday ? Math.min(...merged.map((c) => c.low))  : 0)),
     vwap,
     rsi:   calcRSI(dailyCloses),
     ma: {
@@ -382,12 +390,18 @@ export async function fetchSpyReplayStats(date: string): Promise<{ daily_stats: 
   const period1 = new Date(targetDate.getTime() - 24 * 60 * 60 * 1000);
   const period2 = new Date(targetDate.getTime() + 2 * 24 * 60 * 60 * 1000);
 
-  const [spyResult, dailyCloses] = await Promise.all([
+  const [spyResult, dailyCloses, dailyResult] = await Promise.all([
     yahooFinance.chart("SPY", { period1, period2, interval: "5m" as const }) as unknown as Promise<YFChartResult>,
     fetchDailyClosesUpTo("SPY", 300, targetDate),
+    yahooFinance.chart("SPY", { period1: targetDate, period2, interval: "1d" as const }) as unknown as Promise<YFChartResult>,
   ]);
 
   const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  const dayCandle = (dailyResult.quotes ?? []).find((q) => {
+    if (!q.date || q.open == null || q.high == null || q.low == null || q.close == null) return false;
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(q.date) === date;
+  });
 
   const spyDay = ((spyResult.quotes ?? []).filter((q) => {
     if (!q.date || q.open == null || q.high == null || q.low == null || q.close == null || !q.volume || q.volume <= 0) return false;
@@ -404,12 +418,12 @@ export async function fetchSpyReplayStats(date: string): Promise<{ daily_stats: 
   }
   const vwap = cumVol > 0 ? r2(cumTPV / cumVol) : null;
 
-  const hasCandles = spyDay.length > 0;
+  const hasIntraday = spyDay.length > 0;
   const daily_stats: DailyStats = {
-    price: hasCandles ? r2(spyDay[spyDay.length - 1].close) : 0,
-    o:     hasCandles ? r2(spyDay[0].open) : 0,
-    h:     hasCandles ? r2(Math.max(...spyDay.map((c) => c.high))) : 0,
-    l:     hasCandles ? r2(Math.min(...spyDay.map((c) => c.low)))  : 0,
+    price: r2(dayCandle?.close ?? (hasIntraday ? spyDay[spyDay.length - 1].close : 0)),
+    o:     r2(dayCandle?.open  ?? (hasIntraday ? spyDay[0].open : 0)),
+    h:     r2(dayCandle?.high  ?? (hasIntraday ? Math.max(...spyDay.map((c) => c.high)) : 0)),
+    l:     r2(dayCandle?.low   ?? (hasIntraday ? Math.min(...spyDay.map((c) => c.low))  : 0)),
     vwap,
     rsi:   calcRSI(dailyCloses),
     ma: {

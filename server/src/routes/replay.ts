@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { fetchSpxReplayData, fetchSpyReplayStats } from '../services/marketData.js'
 import { getTodayOtherIndexSnapshots } from '../db/otherIndexesRepository.js'
 import { findTradesByDate } from '../db/tradeRepository.js'
+import { getLatestMarketSummary } from '../db/marketSummaryRepository.js'
 
 const router = Router()
 
@@ -14,11 +15,12 @@ router.get('/ai/replay/message', async (req: Request, res: Response) => {
   }
 
   try {
-    const [spxData, spyData, otherIndexSnapshots, trades] = await Promise.all([
+    const [spxData, spyData, otherIndexSnapshots, trades, marketSummary] = await Promise.all([
       fetchSpxReplayData(date),
       fetchSpyReplayStats(date),
       getTodayOtherIndexSnapshots(date),
       findTradesByDate(date),
+      getLatestMarketSummary(),
     ])
 
     const marketDataPayload: Record<string, unknown> = {
@@ -36,11 +38,14 @@ router.get('/ai/replay/message', async (req: Request, res: Response) => {
       })
     }
 
-    res.json({
+    const payload: Record<string, unknown> = {
       timestamp: `${date} 16:00 ET`,
       market_data: marketDataPayload,
       positions: trades,
-    })
+    }
+    if (marketSummary) payload.market_summary = marketSummary
+
+    res.json(payload)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[replay] error:', message)
