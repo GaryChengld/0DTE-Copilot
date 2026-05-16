@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import { fetchSpxReplayData, fetchSpyReplayStats } from '../services/marketData.js'
 import { getTodayOtherIndexSnapshots } from '../db/otherIndexesRepository.js'
 import { findTradesByDate } from '../db/tradeRepository.js'
-import { getLatestMarketSummary } from '../db/marketSummaryRepository.js'
+import { getMarketSummaryByDate } from '../db/marketSummaryRepository.js'
 
 const router = Router()
 
@@ -20,7 +20,7 @@ router.get('/ai/replay/message', async (req: Request, res: Response) => {
       fetchSpyReplayStats(date),
       getTodayOtherIndexSnapshots(date),
       findTradesByDate(date),
-      getLatestMarketSummary(),
+      getMarketSummaryByDate(date),
     ])
 
     const marketDataPayload: Record<string, unknown> = {
