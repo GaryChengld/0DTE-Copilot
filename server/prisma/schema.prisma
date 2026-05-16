@@ -80,3 +80,10 @@ model TradeExit {
   @@index([tradeDate])
   @@index([tradeId])
 }
+
+model ReplayData {
+  id         Int      @id @default(autoincrement())
+  date       String   @unique  // "YYYY-MM-DD"
+  replayData Json              // full replay payload as cached JSON
+  createdAt  DateTime @default(now())
+}

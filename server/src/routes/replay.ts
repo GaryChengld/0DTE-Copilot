@@ -3,6 +3,7 @@ import { fetchSpxReplayData, fetchSpyReplayStats } from '../services/marketData.
 import { getTodayOtherIndexSnapshots } from '../db/otherIndexesRepository.js'
 import { findTradesByDate } from '../db/tradeRepository.js'
 import { getMarketSummaryByDate } from '../db/marketSummaryRepository.js'
+import { getReplayDataByDate, saveReplayData } from '../db/replayDataRepository.js'
 
 const router = Router()
 
@@ -15,6 +16,14 @@ router.get('/ai/replay/message', async (req: Request, res: Response) => {
   }
 
   try {
+    // Cache hit — return stored payload immediately
+    const cached = await getReplayDataByDate(date)
+    if (cached) {
+      res.json(cached)
+      return
+    }
+
+    // Cache miss — fetch from Yahoo Finance + DB, then store
     const [spxData, spyData, otherIndexSnapshots, trades, marketSummary] = await Promise.all([
       fetchSpxReplayData(date),
       fetchSpyReplayStats(date),
@@ -44,6 +53,10 @@ router.get('/ai/replay/message', async (req: Request, res: Response) => {
       positions: trades,
     }
     if (marketSummary) payload.market_summary = marketSummary
+
+    saveReplayData(date, payload).catch((err) =>
+      console.error('[replay] failed to cache payload:', err instanceof Error ? err.message : err)
+    )
 
     res.json(payload)
   } catch (err) {
