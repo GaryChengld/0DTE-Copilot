@@ -114,6 +114,7 @@ npm run build            # build frontend for production
 | [64-history-panel](.claude/tasks/64-history-panel.md) | Trading/Review mode toggle — Review mode replaces left+middle panels with calendar, SPX chart, AI advice log, and journal editor | 2026-04-18 |
 | [65-review-mode-pnl](.claude/tasks/65-review-mode-pnl.md) | Review mode left panel: monthly P&L total, P&L-colored calendar highlights, daily trade details below chart | 2026-04-18 |
 | [66-replay-tab](.claude/tasks/66-replay-tab.md) | Review mode right panel: Replay tab generates historical AI analysis payload for selected date | 2026-05-16 |
+| [67-replay-data-cache](.claude/tasks/67-replay-data-cache.md) | ReplayData table caches replay payloads by date — instant repeat loads, skips Yahoo Finance | 2026-05-16 |
 
 ### Tools
 
