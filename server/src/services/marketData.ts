@@ -46,6 +46,7 @@ export interface Candle5m {
   l: number;
   c: number;
   v: number;
+  vwap?: number; // cumulative intraday VWAP — present on replay candles, absent on live candles
 }
 
 export interface DailyStats {
@@ -345,32 +346,34 @@ export async function fetchSpxReplayData(date: string): Promise<{ candles_5m: Ca
     return { ...spx, volume: spy?.volume ?? 0 };
   });
 
-  // Cumulative VWAP for the day
+  // Single pass: build candles with per-candle running VWAP
   let cumTPV = 0;
   let cumVol = 0;
-  for (const c of merged) {
+  const candles_5m: Candle5m[] = merged.map((c) => {
     const tp = (c.high + c.low + c.close) / 3;
     cumTPV += tp * c.volume;
     cumVol += c.volume;
-  }
-  const vwap = cumVol > 0 ? r2(cumTPV / cumVol) : null;
+    return {
+      t:    formatTimeET(c.date),
+      o:    r2(c.open),
+      h:    r2(c.high),
+      l:    r2(c.low),
+      c:    r2(c.close),
+      v:    c.volume,
+      vwap: cumVol > 0 ? r2(cumTPV / cumVol) : r2(c.close),
+    };
+  });
 
-  const candles_5m: Candle5m[] = merged.map((c) => ({
-    t: formatTimeET(c.date),
-    o: r2(c.open),
-    h: r2(c.high),
-    l: r2(c.low),
-    c: r2(c.close),
-    v: c.volume,
-  }));
+  // Daily VWAP = last candle's running VWAP (or null if no intraday data)
+  const vwap = candles_5m.length > 0 ? (candles_5m[candles_5m.length - 1].vwap ?? null) : null;
 
   // Prefer 1d candle for OHLC/price (goes back years); fall back to intraday aggregates
   const hasIntraday = merged.length > 0;
   const daily_stats: DailyStats = {
-    price: r2(dayCandle?.close  ?? (hasIntraday ? merged[merged.length - 1].close : 0)),
-    o:     r2(dayCandle?.open   ?? (hasIntraday ? merged[0].open : 0)),
-    h:     r2(dayCandle?.high   ?? (hasIntraday ? Math.max(...merged.map((c) => c.high)) : 0)),
-    l:     r2(dayCandle?.low    ?? (hasIntraday ? Math.min(...merged.map((c) => c.low))  : 0)),
+    price: r2(dayCandle?.close ?? (hasIntraday ? merged[merged.length - 1].close : 0)),
+    o:     r2(dayCandle?.open  ?? (hasIntraday ? merged[0].open : 0)),
+    h:     r2(dayCandle?.high  ?? (hasIntraday ? Math.max(...merged.map((c) => c.high)) : 0)),
+    l:     r2(dayCandle?.low   ?? (hasIntraday ? Math.min(...merged.map((c) => c.low))  : 0)),
     vwap,
     rsi:   calcRSI(dailyCloses),
     ma: {
@@ -382,7 +385,7 @@ export async function fetchSpxReplayData(date: string): Promise<{ candles_5m: Ca
     },
   };
 
-  return { candles_5m, daily_stats };
+  return { daily_stats, candles_5m };
 }
 
 export async function fetchSpyReplayStats(date: string): Promise<{ daily_stats: DailyStats }> {
