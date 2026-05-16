@@ -282,6 +282,148 @@ async function fetchDailyCandles(symbol: string, days: number): Promise<{ high: 
     .map((q) => ({ high: q.high!, low: q.low!, close: q.close! }));
 }
 
+async function fetchDailyClosesUpTo(symbol: string, days: number, upToDate: Date): Promise<number[]> {
+  const period1 = new Date(upToDate.getTime() - days * 24 * 60 * 60 * 1000);
+  const period2 = new Date(upToDate.getTime() + 24 * 60 * 60 * 1000);
+
+  const result = (await yahooFinance.chart(symbol, {
+    period1,
+    period2,
+    interval: "1d" as const,
+  })) as unknown as YFChartResult;
+
+  return (result.quotes ?? []).filter((q) => q.close != null).map((q) => q.close!);
+}
+
+async function fetchDailyCandlesUpTo(symbol: string, days: number, upToDate: Date): Promise<{ high: number; low: number; close: number }[]> {
+  const period1 = new Date(upToDate.getTime() - days * 24 * 60 * 60 * 1000);
+  const period2 = new Date(upToDate.getTime() + 24 * 60 * 60 * 1000);
+
+  const result = (await yahooFinance.chart(symbol, {
+    period1,
+    period2,
+    interval: "1d" as const,
+  })) as unknown as YFChartResult;
+
+  return (result.quotes ?? [])
+    .filter((q) => q.high != null && q.low != null && q.close != null)
+    .map((q) => ({ high: q.high!, low: q.low!, close: q.close! }));
+}
+
+export async function fetchSpxReplayData(date: string): Promise<{ candles_5m: Candle5m[]; daily_stats: DailyStats }> {
+  const targetDate = new Date(`${date}T12:00:00Z`);
+  const period1 = new Date(targetDate.getTime() - 24 * 60 * 60 * 1000);
+  const period2 = new Date(targetDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+  const [spxResult, spyResult, dailyCloses] = await Promise.all([
+    yahooFinance.chart("^GSPC", { period1, period2, interval: "5m" as const }) as unknown as Promise<YFChartResult>,
+    yahooFinance.chart("SPY",   { period1, period2, interval: "5m" as const }) as unknown as Promise<YFChartResult>,
+    fetchDailyClosesUpTo("^GSPC", 300, targetDate),
+  ]);
+
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  const filterDay = (quotes: YFQuote[]): RTHCandle[] =>
+    (quotes ?? []).filter((q) => {
+      if (!q.date || q.open == null || q.high == null || q.low == null || q.close == null || !q.volume || q.volume <= 0) return false;
+      const d = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(q.date);
+      return d === date && isRTHCandle(q.date);
+    }) as RTHCandle[];
+
+  const spxDay = filterDay(spxResult.quotes ?? []);
+  const spyDay = filterDay(spyResult.quotes ?? []);
+
+  const merged = spxDay.map((spx) => {
+    const spy = spyDay.find((s) => s.date.getTime() === spx.date.getTime());
+    return { ...spx, volume: spy?.volume ?? 0 };
+  });
+
+  // Cumulative VWAP for the day
+  let cumTPV = 0;
+  let cumVol = 0;
+  for (const c of merged) {
+    const tp = (c.high + c.low + c.close) / 3;
+    cumTPV += tp * c.volume;
+    cumVol += c.volume;
+  }
+  const vwap = cumVol > 0 ? r2(cumTPV / cumVol) : null;
+
+  const candles_5m: Candle5m[] = merged.map((c) => ({
+    t: formatTimeET(c.date),
+    o: r2(c.open),
+    h: r2(c.high),
+    l: r2(c.low),
+    c: r2(c.close),
+    v: c.volume,
+  }));
+
+  const hasCandles = merged.length > 0;
+  const daily_stats: DailyStats = {
+    price: hasCandles ? r2(merged[merged.length - 1].close) : 0,
+    o:     hasCandles ? r2(merged[0].open) : 0,
+    h:     hasCandles ? r2(Math.max(...merged.map((c) => c.high))) : 0,
+    l:     hasCandles ? r2(Math.min(...merged.map((c) => c.low)))  : 0,
+    vwap,
+    rsi:   calcRSI(dailyCloses),
+    ma: {
+      "5":   calcMA(dailyCloses, 5),
+      "20":  calcMA(dailyCloses, 20),
+      "50":  calcMA(dailyCloses, 50),
+      "100": calcMA(dailyCloses, 100),
+      "200": calcMA(dailyCloses, 200),
+    },
+  };
+
+  return { candles_5m, daily_stats };
+}
+
+export async function fetchSpyReplayStats(date: string): Promise<{ daily_stats: DailyStats }> {
+  const targetDate = new Date(`${date}T12:00:00Z`);
+  const period1 = new Date(targetDate.getTime() - 24 * 60 * 60 * 1000);
+  const period2 = new Date(targetDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+  const [spyResult, dailyCloses] = await Promise.all([
+    yahooFinance.chart("SPY", { period1, period2, interval: "5m" as const }) as unknown as Promise<YFChartResult>,
+    fetchDailyClosesUpTo("SPY", 300, targetDate),
+  ]);
+
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  const spyDay = ((spyResult.quotes ?? []).filter((q) => {
+    if (!q.date || q.open == null || q.high == null || q.low == null || q.close == null || !q.volume || q.volume <= 0) return false;
+    const d = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(q.date);
+    return d === date && isRTHCandle(q.date);
+  }) as RTHCandle[]);
+
+  let cumTPV = 0;
+  let cumVol = 0;
+  for (const c of spyDay) {
+    const tp = (c.high + c.low + c.close) / 3;
+    cumTPV += tp * c.volume;
+    cumVol += c.volume;
+  }
+  const vwap = cumVol > 0 ? r2(cumTPV / cumVol) : null;
+
+  const hasCandles = spyDay.length > 0;
+  const daily_stats: DailyStats = {
+    price: hasCandles ? r2(spyDay[spyDay.length - 1].close) : 0,
+    o:     hasCandles ? r2(spyDay[0].open) : 0,
+    h:     hasCandles ? r2(Math.max(...spyDay.map((c) => c.high))) : 0,
+    l:     hasCandles ? r2(Math.min(...spyDay.map((c) => c.low)))  : 0,
+    vwap,
+    rsi:   calcRSI(dailyCloses),
+    ma: {
+      "5":   calcMA(dailyCloses, 5),
+      "20":  calcMA(dailyCloses, 20),
+      "50":  calcMA(dailyCloses, 50),
+      "100": calcMA(dailyCloses, 100),
+      "200": calcMA(dailyCloses, 200),
+    },
+  };
+
+  return { daily_stats };
+}
+
 // --- SPX intraday candles ---
 
 export interface SpxCandle {

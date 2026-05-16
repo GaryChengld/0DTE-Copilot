@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Pencil, Trash2 } from "lucide-react";
+import { Check, Copy, Loader2, Pencil, Trash2 } from "lucide-react";
 import SpxCandleChart from "./SpxCandleChart";
 import HistoryCalendar from "./HistoryCalendar";
 import JournalModal from "./JournalModal";
@@ -14,6 +14,7 @@ import {
   type JournalEntry,
   type AiAdviceEntry,
 } from "../api/journal";
+import { getReplayPayload } from "../api/replay";
 import {
   getMonthlyPnl,
   getTradesByDate,
@@ -301,11 +302,82 @@ function JournalView({
   );
 }
 
+// ── Sub-component: ReplayView ──────────────────────────────────────────────
+
+function ReplayView({ date, active }: { date: string; active: boolean }) {
+  const [payload, setPayload] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const lastFetchedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    if (lastFetchedRef.current === date) return;
+    lastFetchedRef.current = date;
+    setLoading(true);
+    setPayload(null);
+    setError(null);
+    getReplayPayload(date)
+      .then((data) => setPayload(JSON.stringify(data, null, 2)))
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load replay payload."))
+      .finally(() => setLoading(false));
+  }, [active, date]);
+
+  async function handleCopy() {
+    if (!payload) return;
+    await navigator.clipboard.writeText(payload);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (!active && !payload && !loading) {
+    return (
+      <p className="text-sm text-center py-8" style={{ color: "var(--text-muted)" }}>
+        Select the Replay tab to generate the prompt.
+      </p>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm py-8" style={{ color: "var(--text-muted)" }}>
+        <Loader2 size={14} className="animate-spin" />
+        Loading replay payload…
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="text-sm py-8" style={{ color: "#f87171" }}>{error}</p>;
+  }
+
+  if (payload) {
+    return (
+      <div className="relative flex-1 min-h-0 h-full">
+        <button
+          onClick={handleCopy}
+          className="absolute top-2 right-2 z-10 px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors"
+          style={{ background: "#1c2333", color: "var(--text-muted)" }}
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+        <pre className="h-full overflow-auto rounded p-4 pt-8 text-xs font-mono whitespace-pre" style={{ background: "#0d1117", border: "1px solid var(--border)", color: "#c9d1d9" }}>
+          {payload}
+        </pre>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
-type RightTab = "advices" | "journal";
+type RightTab = "advices" | "journal" | "replay";
 
-export default function HistoryPanel() {
+export default function HistoryPanel({ visible }: { visible: boolean }) {
   const today = todayET();
   const [selectedDate, setSelectedDate] = useState(today);
   const [calendarYear, setCalendarYear] = useState(() => parseInt(today.slice(0, 4)));
@@ -320,6 +392,44 @@ export default function HistoryPanel() {
   const [journalModalOpen, setJournalModalOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [dateLoading, setDateLoading] = useState(false);
+  const prevVisibleRef = useRef(false);
+
+  // Re-fetch all data when switching from Trading → Review mode so stale P&L and
+  // trade data from activity in Trading mode are immediately reflected.
+  useEffect(() => {
+    if (!visible || prevVisibleRef.current) {
+      prevVisibleRef.current = visible;
+      return;
+    }
+    prevVisibleRef.current = true;
+
+    getMonthlyPnl(calendarYear, calendarMonth)
+      .then((entries) => {
+        const map = new Map(entries.map((e) => [e.date, e.pnl]));
+        setPnlByDate(map);
+        setMonthlyTotal(entries.length > 0 ? entries.reduce((s, e) => s + e.pnl, 0) : null);
+      })
+      .catch(() => {});
+
+    setDateLoading(true);
+    setCandles([]);
+    setAdvices([]);
+    setJournal(null);
+    setTrades([]);
+    Promise.all([
+      fetchSpxCandlesByDate(selectedDate).catch(() => [] as SpxCandle[]),
+      fetchAiAdvicesByDate(selectedDate).catch(() => [] as AiAdviceEntry[]),
+      fetchJournalByDate(selectedDate).catch(() => null),
+      getTradesByDate(selectedDate).catch(() => [] as TradeWithExits[]),
+    ]).then(([c, a, j, t]) => {
+      setCandles(c);
+      setAdvices(a);
+      setJournal(j);
+      setTrades(t);
+      setDateLoading(false);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   // Fetch monthly P&L whenever the displayed month changes
   useEffect(() => {
@@ -428,7 +538,7 @@ export default function HistoryPanel() {
           className="flex shrink-0 border-b px-3 pt-2 gap-1"
           style={{ borderColor: "var(--border)" }}
         >
-          {(["advices", "journal"] as RightTab[]).map((tab) => (
+          {(["advices", "journal", "replay"] as RightTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setRightTab(tab)}
@@ -439,7 +549,7 @@ export default function HistoryPanel() {
               }`}
               style={{ color: rightTab === tab ? undefined : "var(--text-muted)" }}
             >
-              {tab === "advices" ? "AI Advice" : "Journal"}
+              {tab === "advices" ? "AI Advice" : tab === "journal" ? "Journal" : "Replay"}
             </button>
           ))}
           <span
@@ -465,6 +575,9 @@ export default function HistoryPanel() {
             onDeleteCancel={() => setDeleteConfirm(false)}
             onDeleteConfirm={handleDeleteJournal}
           />
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col" style={{ display: rightTab === "replay" ? undefined : "none" }}>
+          <ReplayView date={selectedDate} active={rightTab === "replay"} />
         </div>
       </div>
 
