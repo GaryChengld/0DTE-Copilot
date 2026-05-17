@@ -114,7 +114,7 @@ export default function App() {
 
         {/* Review mode panel — always mounted to preserve calendar state, hidden in trading mode */}
         <div className={`flex-1 overflow-hidden${mode === "trading" ? " hidden" : ""}`}>
-          <HistoryPanel />
+          <HistoryPanel visible={mode === "review"} />
         </div>
 
         {/* Right sidebar */}

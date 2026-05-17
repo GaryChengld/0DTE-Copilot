@@ -71,6 +71,22 @@ export default function SpxCandleChart({ candles }: SpxCandleChartProps) {
 
     chartRef.current = chart;
 
+    // If the chart is created while its container is hidden (width 0 — e.g. Review mode panel
+    // is mounted but not yet visible), autoSize will resize the chart correctly once the panel
+    // becomes visible, but the time scale won't re-fit because fitContent() was already called
+    // at width 0. Watch for the 0→non-zero transition and re-fit once.
+    let wasZeroWidth = container.clientWidth === 0;
+    const visibilityObserver = new ResizeObserver(() => {
+      if (wasZeroWidth && container.clientWidth > 0) {
+        wasZeroWidth = false;
+        chart.timeScale().fitContent();
+        visibilityObserver.disconnect();
+      }
+    });
+    if (wasZeroWidth) {
+      visibilityObserver.observe(container);
+    }
+
     // Pane 0 — candlesticks + VWAP
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#26a69a",
@@ -151,6 +167,7 @@ export default function SpxCandleChart({ candles }: SpxCandleChartProps) {
     seriesRef.current = { candleSeries, vwapSeries, volSeries, rsiSeries, rsi70Series, rsi30Series };
 
     return () => {
+      visibilityObserver.disconnect();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;

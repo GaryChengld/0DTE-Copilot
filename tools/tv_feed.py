@@ -13,6 +13,8 @@ Usage:
     python tv_feed.py --server http://localhost:3001
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import sys
@@ -23,7 +25,6 @@ from zoneinfo import ZoneInfo
 
 import requests
 from dotenv import load_dotenv
-from tvDatafeed import Interval, TvDatafeed
 
 load_dotenv()
 
@@ -185,6 +186,9 @@ def post_to_server(server_url: str, time_str: str, data: dict) -> None:
 # ---------------------------------------------------------------------------
 
 def main():
+    print(f"tv_feed starting at {now_et().strftime('%Y-%m-%d %H:%M:%S')} ET — loading dependencies...")
+    global Interval, TvDatafeed  # noqa: PLW0603 — deferred import; names must be module-global for fetch_latest
+    from tvDatafeed import Interval, TvDatafeed
     parser = argparse.ArgumentParser(description="Poll TradingView internals and feed to local server")
     parser.add_argument("--interval", type=int, default=5,
                         help="Market-hours polling interval in minutes (default: 5)")
