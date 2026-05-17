@@ -14,7 +14,8 @@ import marketSnapshotRouter from "./routes/marketSnapshot.js";
 import spxCandlesRouter from "./routes/spxCandles.js";
 import sectorEtfsRouter from "./routes/sectorEtfs.js";
 import journalRouter from "./routes/journal.js";
-import replayRouter from "./routes/replay.js";
+import replayRouter from "./routes/replay.js"
+import rulesRouter from "./routes/rules.js";
 import { sendToAI } from "./services/aiSession.js";
 import { createAiAdvice } from "./db/ingestionRepository.js";
 
@@ -41,6 +42,7 @@ app.use("/api", spxCandlesRouter);
 app.use("/api", sectorEtfsRouter);
 app.use("/api", journalRouter);
 app.use("/api", replayRouter);
+app.use("/api", rulesRouter);
 
 // Socket.io
 io.on("connection", (socket) => {

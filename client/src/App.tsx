@@ -9,10 +9,11 @@ import OpenPositions from "./components/OpenPositions";
 import NewsPanel from "./components/NewsPanel";
 import NewsKeywordsModal from "./components/NewsKeywordsModal";
 import MarketDataPanel from "./components/MarketDataPanel";
+import RulesPanel from "./components/RulesPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import { getNews, type NewsItem } from "./api/news";
 
-type Tab = "conversation" | "preview";
+type Tab = "conversation" | "preview" | "rules";
 type AppMode = "trading" | "review";
 type SidebarTab = "positions" | "news";
 
@@ -91,6 +92,17 @@ export default function App() {
             >
               Preview Prompt
             </button>
+            <button
+              className={`px-4 py-2 text-sm border-b-2 transition-colors ${
+                activeTab === "rules"
+                  ? "border-blue-500 text-white"
+                  : "border-transparent hover:text-white"
+              }`}
+              style={{ color: activeTab === "rules" ? undefined : "var(--text-muted)" }}
+              onClick={() => setActiveTab("rules")}
+            >
+              Rules
+            </button>
           </div>
 
           <div className="flex-1 overflow-hidden relative">
@@ -100,16 +112,21 @@ export default function App() {
             <div className={`absolute inset-0 overflow-y-auto py-4 px-[1.5%]${activeTab !== "preview" ? " hidden" : ""}`}>
               <PreviewAnalysisPrompt trigger={previewTrigger} />
             </div>
+            <div className={`absolute inset-0${activeTab !== "rules" ? " hidden" : ""}`}>
+              <RulesPanel />
+            </div>
           </div>
 
-          <div className="h-24 py-3 px-[1.5%] shrink-0" style={{ borderTop: "1px solid var(--border)" }}>
-            <ChatInputBar
-              message={message}
-              onMessageChange={setMessage}
-              activeTab={activeTab}
-              onPreview={handlePreview}
-            />
-          </div>
+          {activeTab !== "rules" && (
+            <div className="h-24 py-3 px-[1.5%] shrink-0" style={{ borderTop: "1px solid var(--border)" }}>
+              <ChatInputBar
+                message={message}
+                onMessageChange={setMessage}
+                activeTab={activeTab}
+                onPreview={handlePreview}
+              />
+            </div>
+          )}
         </div>
 
         {/* Review mode panel — always mounted to preserve calendar state, hidden in trading mode */}

@@ -758,3 +758,20 @@ export async function fetchMarketData(): Promise<MarketData> {
     },
   };
 }
+
+// Fetch the last `days` VIX daily closes — used for 20-day MA and previous close.
+export async function fetchVixDailyCloses(days: number): Promise<number[]> {
+  const period1 = new Date(Date.now() - Math.ceil(days * 1.6) * 24 * 60 * 60 * 1000);
+  const result = (await yahooFinance.chart("^VIX", {
+    period1,
+    interval: "1d" as const,
+  })) as unknown as YFChartResult;
+  const closes = (result.quotes ?? []).filter((q) => q.close != null).map((q) => q.close!);
+  return closes.slice(-days);
+}
+
+// Fetch the most recent completed SPX daily close — used for opening gap calculation (K6).
+export async function fetchSpxPrevDayClose(): Promise<number | null> {
+  const closes = await fetchDailyCloses("^GSPC", 5);
+  return closes.length > 0 ? closes[closes.length - 1] : null;
+}

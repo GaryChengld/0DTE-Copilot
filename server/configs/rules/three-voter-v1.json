@@ -1,0 +1,25 @@
+{
+  "scanWindowStart": "10:15",
+  "scanWindowEnd": "14:00",
+  "params": {
+    "rsiOverbought": 70,
+    "rsiOverboughtConfirm": 65,
+    "rsiOversold": 30,
+    "rsiOversoldConfirm": 35,
+    "shadowMinPt": 3,
+    "addTrendThreshold": 500,
+    "b2Readings": 3,
+    "vixKillThreshold": 35,
+    "vixChangeKillPt": 4,
+    "vixChangeStopPt": 2,
+    "openingGapKillPct": 0.005,
+    "gammaFlipOffsetPt": 50,
+    "distanceMinPt": 60,
+    "ivCompressionFactor": 0.85,
+    "vix20MAPeriod": 20,
+    "riskFreeRate": 0.04,
+    "sl1Multiplier": 2.0,
+    "tp1Multiplier": 0.3,
+    "tp2Multiplier": 0.5
+  }
+}
