@@ -46,6 +46,7 @@ const EMPTY_DETAIL: VoterDetail = {
 
 const v = (b: boolean) => b ? '✓' : '✗'
 
+// Used for early-return HALT/WAIT rows before mode-correct voters are computed.
 function backtestSummaryFromDetail(
   detail: VoterDetail,
   result: string,
@@ -56,6 +57,17 @@ function backtestSummaryFromDetail(
   const bcStr = `BC[T${v(bc.t.pass)} O${v(bc.o.pass)} B${v(bc.b.pass)}]`
   const mode  = addMode ? ` (${addMode.split(' ')[0]})` : ''
   return `${bpStr} ${bcStr} → ${result}${mode}`
+}
+
+// Used for final GO/WAIT/NO-GO rows — reflects the actual mode-correct voters.
+function backtestSummaryFromResult(
+  direction: Direction,
+  tPass: boolean, oPass: boolean, bPass: boolean,
+  result: string, addMode?: string
+): string {
+  const dir  = direction === 'bull_put' ? 'BP' : 'BC'
+  const mode = addMode ? ` (${addMode.split(' ')[0]})` : ''
+  return `${dir}[T${v(tPass)} O${v(oPass)} B${v(bPass)}] → ${result}${mode}`
 }
 
 // ── Kill Switches (Layer 1) ───────────────────────────────────────────────────
@@ -442,17 +454,17 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     lines.push(`- **Stop Loss (SL1):** spread ≥ $${(credit * p.sl1Multiplier).toFixed(2)} (${(p.sl1Multiplier * 100).toFixed(0)}% loss)`)
     lines.push(`- **Take Profit (TP1):** spread ≤ $${(credit * p.tp1Multiplier).toFixed(2)} (${((1 - p.tp1Multiplier) * 100).toFixed(0)}% profit)`)
     lines.push(`- **Take Profit (TP2):** spread ≤ $${(credit * p.tp2Multiplier).toFixed(2)} after 13:45 ET`)
-    return { result: 'GO', direction, addMode: mode, shortStrike, longStrike, estimatedCredit: credit, backtestSummary: backtestSummaryFromDetail(voterDetail, 'GO', mode), markdown: lines.join('\n'), voterDetail }
+    return { result: 'GO', direction, addMode: mode, shortStrike, longStrike, estimatedCredit: credit, backtestSummary: backtestSummaryFromResult(direction, tResult.pass, oResult.pass, bResult.pass, 'GO', mode), markdown: lines.join('\n'), voterDetail }
   }
 
   if (votes >= 1 || (votes === 2 && !o3Pass)) {
     const reason = votes >= 2 && !o3Pass ? ' (O3 mandatory — did not pass)' : ''
     lines.push(`# ⏳ WAIT — ${votes}/3 voters pass${reason}`)
-    return { result: 'WAIT', direction, addMode: mode, backtestSummary: backtestSummaryFromDetail(voterDetail, 'WAIT', mode), markdown: lines.join('\n'), voterDetail }
+    return { result: 'WAIT', direction, addMode: mode, backtestSummary: backtestSummaryFromResult(direction, tResult.pass, oResult.pass, bResult.pass, 'WAIT', mode), markdown: lines.join('\n'), voterDetail }
   }
 
   lines.push('# ❌ NO-GO — 0/3 voters pass')
-  return { result: 'NO-GO', direction, addMode: mode, backtestSummary: backtestSummaryFromDetail(voterDetail, 'NO-GO', mode), markdown: lines.join('\n'), voterDetail }
+  return { result: 'NO-GO', direction, addMode: mode, backtestSummary: backtestSummaryFromResult(direction, tResult.pass, oResult.pass, bResult.pass, 'NO-GO', mode), markdown: lines.join('\n'), voterDetail }
 }
 
 export const threeVoterV1Service: RuleService = { evaluate }
