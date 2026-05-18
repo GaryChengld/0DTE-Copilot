@@ -1,4 +1,4 @@
-import type { RuleService, EvalContext, EvaluationResult, VoterDetail } from '../types.js'
+import type { RuleService, EvalContext, EvaluationResult, VoterDetail, VoterResult } from '../types.js'
 import type { TradeWithExits } from '../../db/tradeRepository.js'
 import {
   computeRsi5, computeCandleShadows, computeOpeningGap,
@@ -34,14 +34,28 @@ interface ThreeVoterConfig {
 }
 
 type AddMode = 'trend-aligned' | 'oscillation' | 'conflict'
-type VoterResult = { pass: boolean; details: string[] }
 
 const ok  = (s: string) => `✅ ${s}`
 const bad = (s: string) => `❌ ${s}`
 
+const EMPTY_VOTER: VoterResult = { pass: false, details: [] }
 const EMPTY_DETAIL: VoterDetail = {
-  bullPut:  { t: false, o: false, b: false },
-  bearCall: { t: false, o: false, b: false },
+  bullPut:  { t: EMPTY_VOTER, o: EMPTY_VOTER, b: EMPTY_VOTER },
+  bearCall: { t: EMPTY_VOTER, o: EMPTY_VOTER, b: EMPTY_VOTER },
+}
+
+const v = (b: boolean) => b ? '✓' : '✗'
+
+function backtestSummaryFromDetail(
+  detail: VoterDetail,
+  result: string,
+  addMode?: string
+): string {
+  const { bullPut: bp, bearCall: bc } = detail
+  const bpStr = `BP[T${v(bp.t.pass)} O${v(bp.o.pass)} B${v(bp.b.pass)}]`
+  const bcStr = `BC[T${v(bc.t.pass)} O${v(bc.o.pass)} B${v(bc.b.pass)}]`
+  const mode  = addMode ? ` (${addMode.split(' ')[0]})` : ''
+  return `${bpStr} ${bcStr} → ${result}${mode}`
 }
 
 // ── Kill Switches (Layer 1) ───────────────────────────────────────────────────
@@ -61,7 +75,7 @@ function checkKillSwitches(ctx: EvalContext, cfg: ThreeVoterConfig): string[] {
     reasons.push(`K4: Position currently open`)
   if (time < scanWindowStart || time > scanWindowEnd)
     reasons.push(`K5: Outside scan window ${scanWindowStart}–${scanWindowEnd} ET (now ${time})`)
-  if (ctx.prevSpxClose !== null && ctx.todayCandles.length > 0) {
+  if (ctx.prevSpxClose !== null && ctx.todayCandles.length === 1) {
     const gap = computeOpeningGap(ctx.todayCandles[0].o, ctx.prevSpxClose)
     if (gap > p.openingGapKillPct)
       reasons.push(`K6: Opening gap ${(gap * 100).toFixed(2)}% > ${(p.openingGapKillPct * 100).toFixed(1)}%`)
@@ -326,7 +340,8 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     otherKills.forEach(r => lines.push(`- ${bad(r)}`))
     lines.push('')
     lines.push('**Status: HALT**')
-    return { result: 'HALT', haltReason: otherKills.join('; '), markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
+    const hr = otherKills.join('; ')
+    return { result: 'HALT', haltReason: hr, backtestSummary: `HALT — ${hr}`, markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
   }
 
   if (k4Reason) {
@@ -338,7 +353,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     lines.push('')
     lines.push('---')
     lines.push('**Status: HALT** — No new positions while a position is open.')
-    return { result: 'HALT', haltReason: k4Reason, markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
+    return { result: 'HALT', haltReason: k4Reason, backtestSummary: `HALT — ${k4Reason}`, markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
   }
 
   lines.push('- ' + ok('All clear'))
@@ -349,7 +364,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
   if (candles.length < 2) {
     lines.push('## Insufficient Data')
     lines.push('Need ≥2 closed 5-min candles. Market may not have opened yet.')
-    return { result: 'WAIT', markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
+    return { result: 'WAIT', backtestSummary: 'WAIT — insufficient candles', markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
   }
 
   // Layer 2: ADD mode
@@ -380,23 +395,8 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
   const bBC = voterB('bear_call', 'trend-aligned', ctx.addReadings, vixChg, 2, p)
 
   const voterDetail: VoterDetail = {
-    bullPut:  { t: tBP.pass, o: oBP.pass, b: bBP.pass },
-    bearCall: { t: tBC.pass, o: oBC.pass, b: bBC.pass },
-  }
-
-  // O directional confirmation early exit (oscillation + conflict modes)
-  if (mode !== 'trend-aligned' && gex) {
-    const dc = direction === 'bear_call' ? spx > gex.gamma_flip : spx < gex.gamma_flip
-    if (!dc) {
-      lines.push('## O Directional Confirmation — ❌ Failed')
-      lines.push(
-        `SPX ${spx.toFixed(2)} does not confirm ${direction === 'bear_call' ? 'Bear Call' : 'Bull Put'} ` +
-        `direction relative to Gamma Flip ${gex.gamma_flip}`
-      )
-      lines.push('')
-      lines.push('**Status: WAIT** — Directional confirmation required in oscillation/conflict mode.')
-      return { result: 'WAIT', direction, addMode: mode, markdown: lines.join('\n'), voterDetail }
-    }
+    bullPut:  { t: tBP, o: oBP, b: bBP },
+    bearCall: { t: tBC, o: oBC, b: bBC },
   }
 
   // Layer 3: voters (mode-correct direction and bThr for GO decision)
@@ -442,17 +442,17 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     lines.push(`- **Stop Loss (SL1):** spread ≥ $${(credit * p.sl1Multiplier).toFixed(2)} (${(p.sl1Multiplier * 100).toFixed(0)}% loss)`)
     lines.push(`- **Take Profit (TP1):** spread ≤ $${(credit * p.tp1Multiplier).toFixed(2)} (${((1 - p.tp1Multiplier) * 100).toFixed(0)}% profit)`)
     lines.push(`- **Take Profit (TP2):** spread ≤ $${(credit * p.tp2Multiplier).toFixed(2)} after 13:45 ET`)
-    return { result: 'GO', direction, addMode: mode, shortStrike, longStrike, estimatedCredit: credit, markdown: lines.join('\n'), voterDetail }
+    return { result: 'GO', direction, addMode: mode, shortStrike, longStrike, estimatedCredit: credit, backtestSummary: backtestSummaryFromDetail(voterDetail, 'GO', mode), markdown: lines.join('\n'), voterDetail }
   }
 
   if (votes >= 1 || (votes === 2 && !o3Pass)) {
     const reason = votes >= 2 && !o3Pass ? ' (O3 mandatory — did not pass)' : ''
     lines.push(`# ⏳ WAIT — ${votes}/3 voters pass${reason}`)
-    return { result: 'WAIT', direction, addMode: mode, markdown: lines.join('\n'), voterDetail }
+    return { result: 'WAIT', direction, addMode: mode, backtestSummary: backtestSummaryFromDetail(voterDetail, 'WAIT', mode), markdown: lines.join('\n'), voterDetail }
   }
 
   lines.push('# ❌ NO-GO — 0/3 voters pass')
-  return { result: 'NO-GO', direction, addMode: mode, markdown: lines.join('\n'), voterDetail }
+  return { result: 'NO-GO', direction, addMode: mode, backtestSummary: backtestSummaryFromDetail(voterDetail, 'NO-GO', mode), markdown: lines.join('\n'), voterDetail }
 }
 
 export const threeVoterV1Service: RuleService = { evaluate }

@@ -12,59 +12,53 @@ import {
 // ── Colour helpers ────────────────────────────────────────────────────────────
 
 const DECISION_COLOR: Record<string, string> = {
-  GO: "#4ade80",
+  GO:      "#4ade80",
   "NO-GO": "#f87171",
-  WAIT: "#facc15",
-  HALT: "#6b7280",
+  WAIT:    "#facc15",
+  HALT:    "#6b7280",
 };
 
 const EXIT_COLOR: Record<string, string> = {
-  TP1: "#4ade80",
-  TP2: "#4ade80",
-  SL1: "#f87171",
-  SL2: "#f87171",
+  TP1: "#4ade80", TP2: "#4ade80",
+  SL1: "#f87171", SL2: "#f87171",
   FORCED: "#facc15",
 };
 
-// ── Small render helpers ──────────────────────────────────────────────────────
-
-function V({ v }: { v: boolean }) {
-  return (
-    <span style={{ color: v ? "#4ade80" : "#4b5563" }}>{v ? "✓" : "✗"}</span>
-  );
-}
-
-function VoterCells({ vd }: { vd: VoterDetail }) {
-  return (
-    <>
-      <td className="px-1 py-0.5 text-center"><V v={vd.bullPut.t}  /></td>
-      <td className="px-1 py-0.5 text-center"><V v={vd.bullPut.o}  /></td>
-      <td className="px-1 py-0.5 text-center"><V v={vd.bullPut.b}  /></td>
-      <td className="px-1 py-0.5 text-center"><V v={vd.bearCall.t} /></td>
-      <td className="px-1 py-0.5 text-center"><V v={vd.bearCall.o} /></td>
-      <td className="px-1 py-0.5 text-center"><V v={vd.bearCall.b} /></td>
-    </>
-  );
-}
-
-function EmptyCells() {
-  return (
-    <td colSpan={6} className="px-2 py-0.5 text-center" style={{ color: "#4b5563" }}>
-      —
-    </td>
-  );
-}
+// ── Notes helper ─────────────────────────────────────────────────────────────
 
 function noteText(bar: BacktestBarRow): string {
   if (bar.isEntry && bar.shortStrike != null)
-    return `Enter ${bar.direction === "bear_call" ? "Bear Call" : "Bull Put"} ${bar.shortStrike}/${bar.longStrike} @ $${bar.entryCredit?.toFixed(2)}`
+    return `${bar.direction === "bear_call" ? "Bear Call" : "Bull Put"} ${bar.shortStrike}/${bar.longStrike} @ $${bar.entryCredit?.toFixed(2)}`
   if (bar.isExit && bar.currentPrice != null)
-    return `Exit $${bar.currentPrice.toFixed(2)}`
+    return `$${bar.currentPrice.toFixed(2)}`
   if (bar.hasPosition && bar.currentPrice != null)
     return `Holding · $${bar.currentPrice.toFixed(2)}`
-  if (bar.haltReason)
-    return bar.haltReason
   return ""
+}
+
+// ── Voter columns ─────────────────────────────────────────────────────────────
+
+function V({ v }: { v: boolean }) {
+  return <span style={{ color: v ? "#4ade80" : "#4b5563" }}>{v ? "✓" : "✗"}</span>
+}
+
+function VoterCells({ vd }: { vd: VoterDetail }) {
+  const tip = (r: { pass: boolean; details: string[] }) =>
+    r.details.join('\n').replace(/[✅❌]/g, '').trim()
+  return (
+    <>
+      <td className="px-1 py-0.5 text-center" title={tip(vd.bullPut.t)}><V v={vd.bullPut.t.pass}  /></td>
+      <td className="px-1 py-0.5 text-center" title={tip(vd.bullPut.o)}><V v={vd.bullPut.o.pass}  /></td>
+      <td className="px-1 py-0.5 text-center" title={tip(vd.bullPut.b)}><V v={vd.bullPut.b.pass}  /></td>
+      <td className="px-1 py-0.5 text-center" title={tip(vd.bearCall.t)}><V v={vd.bearCall.t.pass} /></td>
+      <td className="px-1 py-0.5 text-center" title={tip(vd.bearCall.o)}><V v={vd.bearCall.o.pass} /></td>
+      <td className="px-1 py-0.5 text-center" title={tip(vd.bearCall.b)}><V v={vd.bearCall.b.pass} /></td>
+    </>
+  )
+}
+
+function EmptyVoterCells() {
+  return <td colSpan={6} className="px-2 py-0.5 text-center" style={{ color: "#4b5563" }}>—</td>
 }
 
 // ── Bar table ─────────────────────────────────────────────────────────────────
@@ -76,16 +70,16 @@ function BarTable({ bars }: { bars: BacktestBarRow[] }) {
         <thead>
           <tr style={{ background: "#1c2333", color: "var(--text-muted)" }}>
             <th className="px-2 py-1 text-left" rowSpan={2}>Time</th>
-            <th className="px-2 py-1 text-center" colSpan={3} style={{ borderLeft: "1px solid var(--border)" }}>Bull Put</th>
-            <th className="px-2 py-1 text-center" colSpan={3} style={{ borderLeft: "1px solid var(--border)" }}>Bear Call</th>
-            <th className="px-2 py-1 text-left"  rowSpan={2} style={{ borderLeft: "1px solid var(--border)" }}>Result</th>
-            <th className="px-2 py-1 text-left"  rowSpan={2}>Notes</th>
+            <th className="px-1 py-1 text-center" colSpan={3}>Bull Put</th>
+            <th className="px-1 py-1 text-center" colSpan={3}>Bear Call</th>
+            <th className="px-2 py-1 text-left"   rowSpan={2}>Result</th>
+            <th className="px-2 py-1 text-left"   rowSpan={2}>Notes</th>
           </tr>
           <tr style={{ background: "#1c2333", color: "var(--text-muted)" }}>
-            <th className="px-1 py-0.5 text-center" style={{ borderLeft: "1px solid var(--border)" }}>T</th>
+            <th className="px-1 py-0.5 text-center">T</th>
             <th className="px-1 py-0.5 text-center">O</th>
             <th className="px-1 py-0.5 text-center">B</th>
-            <th className="px-1 py-0.5 text-center" style={{ borderLeft: "1px solid var(--border)" }}>T</th>
+            <th className="px-1 py-0.5 text-center">T</th>
             <th className="px-1 py-0.5 text-center">O</th>
             <th className="px-1 py-0.5 text-center">B</th>
           </tr>
@@ -96,18 +90,15 @@ function BarTable({ bars }: { bars: BacktestBarRow[] }) {
             const decColor = bar.isExit
               ? (EXIT_COLOR[bar.exitReason ?? ""] ?? "white")
               : DECISION_COLOR[bar.decision] ?? "var(--text-muted)"
-            const showVoters = !bar.hasPosition || bar.isExit
+            const showVoters = !bar.hasPosition && bar.voterDetail
 
             return (
               <tr key={i} style={{ background: rowBg, borderTop: "1px solid var(--border)" }}>
-                <td className="px-2 py-0.5 font-mono" style={{ color: "var(--text-muted)" }}>
+                <td className="px-2 py-0.5 font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
                   {bar.time}
                 </td>
-                {showVoters && bar.voterDetail
-                  ? <VoterCells vd={bar.voterDetail} />
-                  : <EmptyCells />
-                }
-                <td className="px-2 py-0.5 font-medium" style={{ color: decColor, borderLeft: "1px solid var(--border)" }}>
+                {showVoters ? <VoterCells vd={bar.voterDetail!} /> : <EmptyVoterCells />}
+                <td className="px-2 py-0.5" style={{ color: decColor }}>
                   {bar.isExit ? bar.exitReason : bar.decision}
                 </td>
                 <td className="px-2 py-0.5" style={{ color: "var(--text-muted)" }}>
@@ -187,12 +178,7 @@ function TradeSummary({ trades, totalPnl }: { trades: BacktestTrade[]; totalPnl:
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-interface BacktestPanelProps {
-  date:   string
-  active: boolean
-}
-
-export default function BacktestPanel({ date, active }: BacktestPanelProps) {
+export default function BacktestPanel({ date, active }: { date: string; active: boolean }) {
   const [rules, setRules]       = useState<RuleInfo[]>([])
   const [selected, setSelected] = useState("")
   const [loading, setLoading]   = useState(false)
@@ -206,7 +192,6 @@ export default function BacktestPanel({ date, active }: BacktestPanelProps) {
       .catch(() => {})
   }, [])
 
-  // Reset when calendar date changes
   useEffect(() => {
     if (lastDateRef.current !== date) {
       lastDateRef.current = date
@@ -217,9 +202,7 @@ export default function BacktestPanel({ date, active }: BacktestPanelProps) {
 
   async function handleRun() {
     if (!selected || !date) return
-    setLoading(true)
-    setResult(null)
-    setError(null)
+    setLoading(true); setResult(null); setError(null)
     try {
       setResult(await runBacktest(selected, date))
     } catch (e) {
@@ -239,7 +222,6 @@ export default function BacktestPanel({ date, active }: BacktestPanelProps) {
 
   return (
     <div className="flex flex-col h-full gap-3 p-3">
-      {/* Controls */}
       <div className="flex items-center gap-2 shrink-0">
         <select
           value={selected}
@@ -249,9 +231,7 @@ export default function BacktestPanel({ date, active }: BacktestPanelProps) {
         >
           {rules.length === 0
             ? <option>Loading…</option>
-            : rules.map(r => (
-                <option key={r.id} value={r.id}>{r.name} v{r.version}</option>
-              ))}
+            : rules.map(r => <option key={r.id} value={r.id}>{r.name} v{r.version}</option>)}
         </select>
         <button
           onClick={handleRun}
@@ -265,16 +245,11 @@ export default function BacktestPanel({ date, active }: BacktestPanelProps) {
       </div>
 
       {error && (
-        <p className="text-xs shrink-0" style={{ color: "#f87171" }}>
-          Error: {error}
-        </p>
+        <p className="text-xs shrink-0" style={{ color: "#f87171" }}>Error: {error}</p>
       )}
 
       {loading && (
-        <div
-          className="flex items-center gap-2 text-xs py-4"
-          style={{ color: "var(--text-muted)" }}
-        >
+        <div className="flex items-center gap-2 text-xs py-4" style={{ color: "var(--text-muted)" }}>
           <Loader2 size={12} className="animate-spin" />
           Running bar-by-bar simulation…
         </div>

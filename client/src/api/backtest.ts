@@ -1,12 +1,13 @@
-export interface BarVoters { t: boolean; o: boolean; b: boolean }
+export interface BarVoterResult { pass: boolean; details: string[] }
+export interface BarVoters { t: BarVoterResult; o: BarVoterResult; b: BarVoterResult }
 export interface VoterDetail { bullPut: BarVoters; bearCall: BarVoters }
 
 export interface BacktestBarRow {
   time:          string
+  summary:       string   // rule-generated one-liner; display without knowing voter structure
   voterDetail?:  VoterDetail
   decision:      'GO' | 'NO-GO' | 'WAIT' | 'HALT'
   direction?:    string
-  addMode?:      string
   hasPosition:   boolean
   isEntry?:      boolean
   isExit?:       boolean

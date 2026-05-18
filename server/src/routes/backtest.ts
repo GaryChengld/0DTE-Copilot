@@ -9,7 +9,7 @@ import {
 import { computeCurrentSpreadPrice, remainingHoursFromBarTime } from '../rules/calculations.js'
 import type {
   EvalContext,
-  BacktestBarRow, BacktestTrade, BacktestResponse, VoterDetail,
+  BacktestBarRow, BacktestTrade, BacktestResponse,
 } from '../rules/types.js'
 
 const router = Router()
@@ -26,11 +26,6 @@ interface ReplayData {
     other_indexes_history?: ReplaySnapshot[]
   }
   market_summary?: unknown
-}
-
-const EMPTY_DETAIL: VoterDetail = {
-  bullPut:  { t: false, o: false, b: false },
-  bearCall: { t: false, o: false, b: false },
 }
 
 function addFiveMinutes(hhmm: string): string {
@@ -144,7 +139,7 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
           })
           bars.push({
             time:         evalTime,
-            voterDetail:  EMPTY_DETAIL,
+            summary:      `EXIT (${exitReason})`,
             decision:     'HALT',
             hasPosition:  true,
             isExit:       true,
@@ -158,7 +153,7 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
         } else {
           bars.push({
             time:         evalTime,
-            voterDetail:  EMPTY_DETAIL,
+            summary:      'HALT (position open)',
             decision:     'HALT',
             hasPosition:  true,
             shortStrike:  pos.shortStrike,
@@ -192,10 +187,10 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
           }
           bars.push({
             time:         evalTime,
-            voterDetail:  evalResult.voterDetail ?? EMPTY_DETAIL,
+            summary:      evalResult.backtestSummary ?? evalResult.result,
+            voterDetail:  evalResult.voterDetail,
             decision:     'GO',
             direction:    evalResult.direction,
-            addMode:      evalResult.addMode,
             hasPosition:  false,
             isEntry:      true,
             shortStrike:  evalResult.shortStrike,
@@ -205,11 +200,10 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
         } else {
           bars.push({
             time:        evalTime,
-            voterDetail: evalResult.voterDetail ?? EMPTY_DETAIL,
+            summary:     evalResult.backtestSummary ?? evalResult.result,
+            voterDetail: evalResult.voterDetail,
             decision:    evalResult.result,
             direction:   evalResult.direction,
-            addMode:     evalResult.addMode,
-            haltReason:  evalResult.haltReason,
             hasPosition: false,
           })
         }
