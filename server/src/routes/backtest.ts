@@ -82,11 +82,13 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
     })
 
     interface ActivePos {
-      direction:   'bear_call' | 'bull_put'
-      shortStrike: number
-      longStrike:  number
-      entryCredit: number
-      entryTime:   string
+      direction:        'bear_call' | 'bull_put'
+      shortStrike:      number
+      longStrike:       number
+      entryCredit:      number
+      entryTime:        string
+      entryAdd:         number   // ADD at entry (0 when no data)
+      entryAddPresent:  boolean  // whether any ADD reading existed at entry
     }
     let activePosition: ActivePos | null = null
 
@@ -113,10 +115,16 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
           currentVix, hoursLeft, params.riskFreeRate ?? 0.04
         )
 
-        // SL2: last 3 ADD readings all opposing position direction (≥15-min reversal proxy)
-        const last3Add = addReadings.slice(-3)
-        const sl2      = last3Add.length >= 3 &&
-          last3Add.every(a => pos.direction === 'bull_put' ? a < 0 : a > 0)
+        // SL2: ADD has reversed to trend-level opposing since entry.
+        // Requires ADD data existed at entry (no baseline = no reversal possible) and
+        // ADD was not already opposing at entry (conflict-mode entries are excluded).
+        const last3Add  = addReadings.slice(-3)
+        const sl2Thr    = params.addTrendThreshold ?? 500
+        const entryWasOpposing = pos.entryAddPresent && (
+          pos.direction === 'bear_call' ? pos.entryAdd > sl2Thr : pos.entryAdd < -sl2Thr
+        )
+        const sl2 = pos.entryAddPresent && !entryWasOpposing && last3Add.length >= 3 &&
+          last3Add.every(a => pos.direction === 'bull_put' ? a < -sl2Thr : a > sl2Thr)
 
         let exitReason: BacktestBarRow['exitReason'] | null = null
         if      (currentPrice >= pos.entryCredit * (params.sl1Multiplier ?? 2.0))   exitReason = 'SL1'
@@ -179,11 +187,13 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
 
         if (evalResult.result === 'GO' && evalResult.estimatedCredit != null && evalResult.shortStrike != null) {
           activePosition = {
-            direction:   evalResult.direction!,
-            shortStrike: evalResult.shortStrike,
-            longStrike:  evalResult.longStrike!,
-            entryCredit: evalResult.estimatedCredit,
-            entryTime:   evalTime,
+            direction:       evalResult.direction!,
+            shortStrike:     evalResult.shortStrike,
+            longStrike:      evalResult.longStrike!,
+            entryCredit:     evalResult.estimatedCredit,
+            entryTime:       evalTime,
+            entryAdd:        addReadings.at(-1) ?? 0,
+            entryAddPresent: addReadings.length > 0,
           }
           bars.push({
             time:         evalTime,

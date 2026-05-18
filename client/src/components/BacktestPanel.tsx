@@ -6,7 +6,6 @@ import {
   type BacktestResponse,
   type BacktestBarRow,
   type BacktestTrade,
-  type VoterDetail,
 } from "../api/backtest";
 
 // ── Colour helpers ────────────────────────────────────────────────────────────
@@ -36,31 +35,6 @@ function noteText(bar: BacktestBarRow): string {
   return ""
 }
 
-// ── Voter columns ─────────────────────────────────────────────────────────────
-
-function V({ v }: { v: boolean }) {
-  return <span style={{ color: v ? "#4ade80" : "#4b5563" }}>{v ? "✓" : "✗"}</span>
-}
-
-function VoterCells({ vd }: { vd: VoterDetail }) {
-  const tip = (r: { pass: boolean; details: string[] }) =>
-    r.details.join('\n').replace(/[✅❌]/g, '').trim()
-  return (
-    <>
-      <td className="px-1 py-0.5 text-center" title={tip(vd.bullPut.t)}><V v={vd.bullPut.t.pass}  /></td>
-      <td className="px-1 py-0.5 text-center" title={tip(vd.bullPut.o)}><V v={vd.bullPut.o.pass}  /></td>
-      <td className="px-1 py-0.5 text-center" title={tip(vd.bullPut.b)}><V v={vd.bullPut.b.pass}  /></td>
-      <td className="px-1 py-0.5 text-center" title={tip(vd.bearCall.t)}><V v={vd.bearCall.t.pass} /></td>
-      <td className="px-1 py-0.5 text-center" title={tip(vd.bearCall.o)}><V v={vd.bearCall.o.pass} /></td>
-      <td className="px-1 py-0.5 text-center" title={tip(vd.bearCall.b)}><V v={vd.bearCall.b.pass} /></td>
-    </>
-  )
-}
-
-function EmptyVoterCells() {
-  return <td colSpan={6} className="px-2 py-0.5 text-center" style={{ color: "#4b5563" }}>—</td>
-}
-
 // ── Bar table ─────────────────────────────────────────────────────────────────
 
 function BarTable({ bars }: { bars: BacktestBarRow[] }) {
@@ -69,19 +43,9 @@ function BarTable({ bars }: { bars: BacktestBarRow[] }) {
       <table className="w-full border-collapse">
         <thead>
           <tr style={{ background: "#1c2333", color: "var(--text-muted)" }}>
-            <th className="px-2 py-1 text-left" rowSpan={2}>Time</th>
-            <th className="px-1 py-1 text-center" colSpan={3}>Bull Put</th>
-            <th className="px-1 py-1 text-center" colSpan={3}>Bear Call</th>
-            <th className="px-2 py-1 text-left"   rowSpan={2}>Result</th>
-            <th className="px-2 py-1 text-left"   rowSpan={2}>Notes</th>
-          </tr>
-          <tr style={{ background: "#1c2333", color: "var(--text-muted)" }}>
-            <th className="px-1 py-0.5 text-center">T</th>
-            <th className="px-1 py-0.5 text-center">O</th>
-            <th className="px-1 py-0.5 text-center">B</th>
-            <th className="px-1 py-0.5 text-center">T</th>
-            <th className="px-1 py-0.5 text-center">O</th>
-            <th className="px-1 py-0.5 text-center">B</th>
+            <th className="px-2 py-1 text-left w-14">Time</th>
+            <th className="px-2 py-1 text-left">Result</th>
+            <th className="px-2 py-1 text-left">Notes</th>
           </tr>
         </thead>
         <tbody>
@@ -90,16 +54,14 @@ function BarTable({ bars }: { bars: BacktestBarRow[] }) {
             const decColor = bar.isExit
               ? (EXIT_COLOR[bar.exitReason ?? ""] ?? "white")
               : DECISION_COLOR[bar.decision] ?? "var(--text-muted)"
-            const showVoters = !bar.hasPosition && bar.voterDetail
 
             return (
               <tr key={i} style={{ background: rowBg, borderTop: "1px solid var(--border)" }}>
                 <td className="px-2 py-0.5 font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
                   {bar.time}
                 </td>
-                {showVoters ? <VoterCells vd={bar.voterDetail!} /> : <EmptyVoterCells />}
                 <td className="px-2 py-0.5" style={{ color: decColor }}>
-                  {bar.isExit ? bar.exitReason : bar.decision}
+                  {bar.summary}
                 </td>
                 <td className="px-2 py-0.5" style={{ color: "var(--text-muted)" }}>
                   {noteText(bar)}
