@@ -4,7 +4,7 @@ import { dirname, join } from 'path'
 import type { RuleService, RuleInfo, EvalContext, EvaluationResult } from './types.js'
 
 const __dir = dirname(fileURLToPath(import.meta.url))
-const CONFIGS = join(__dir, '../../../configs/rules')
+const CONFIGS = join(__dir, '../../configs/rules')
 
 interface IndexEntry {
   id:          string
