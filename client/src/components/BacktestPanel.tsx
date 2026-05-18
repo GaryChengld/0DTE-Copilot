@@ -62,6 +62,8 @@ function noteText(bar: BacktestBarRow): string {
     return `Exit $${bar.currentPrice.toFixed(2)}`
   if (bar.hasPosition && bar.currentPrice != null)
     return `Holding · $${bar.currentPrice.toFixed(2)}`
+  if (bar.haltReason)
+    return bar.haltReason
   return ""
 }
 

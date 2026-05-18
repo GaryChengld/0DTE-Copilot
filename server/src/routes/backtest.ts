@@ -209,6 +209,7 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
             decision:    evalResult.result,
             direction:   evalResult.direction,
             addMode:     evalResult.addMode,
+            haltReason:  evalResult.haltReason,
             hasPosition: false,
           })
         }

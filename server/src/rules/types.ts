@@ -24,6 +24,7 @@ export interface EvaluationResult {
   shortStrike?:     number
   longStrike?:      number
   estimatedCredit?: number
+  haltReason?:      string
   markdown:         string
   voterDetail?:     VoterDetail
 }

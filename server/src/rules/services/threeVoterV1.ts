@@ -326,7 +326,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     otherKills.forEach(r => lines.push(`- ${bad(r)}`))
     lines.push('')
     lines.push('**Status: HALT**')
-    return { result: 'HALT', markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
+    return { result: 'HALT', haltReason: otherKills.join('; '), markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
   }
 
   if (k4Reason) {
@@ -338,7 +338,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     lines.push('')
     lines.push('---')
     lines.push('**Status: HALT** — No new positions while a position is open.')
-    return { result: 'HALT', markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
+    return { result: 'HALT', haltReason: k4Reason, markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
   }
 
   lines.push('- ' + ok('All clear'))
