@@ -101,8 +101,8 @@ export default function App() {
               style={{ color: activeTab === "rules" ? undefined : "var(--text-muted)" }}
               onClick={() => setActiveTab("rules")}
             >
-              Rules
-            </button>
+              Evaluation
+</button>
           </div>
 
           <div className="flex-1 overflow-hidden relative">
