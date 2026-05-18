@@ -10,6 +10,7 @@ import {
 interface ThreeVoterConfig {
   scanWindowStart: string
   scanWindowEnd:   string
+  entryWindowEnd?: string   // no new entries after this time; defaults to scanWindowEnd
   params: {
     rsiOverbought:        number
     rsiOverboughtConfirm: number
@@ -272,8 +273,10 @@ function positionAdvisory(
   trade: TradeWithExits,
   ctx: EvalContext,
   gex: ReturnType<typeof extractGexData>,
-  p: ThreeVoterConfig['params']
+  cfg: ThreeVoterConfig
 ): string {
+  const p           = cfg.params
+  const autoExit    = cfg.scanWindowEnd   // hard exit time (e.g. "15:00")
   const dir: Direction = trade.optionType === 'CALL' ? 'bear_call' : 'bull_put'
   const credit = trade.entryPrice ?? 0
   const time   = ctx.currentTimeET ?? currentEtTime()
@@ -294,6 +297,14 @@ function positionAdvisory(
     lines.push(`> Exit if spread ≤ ${(p.tp2Multiplier * 100).toFixed(0)}% of entry credit ($${(credit * p.tp2Multiplier).toFixed(2)}).`)
   } else {
     lines.push(`> ${time} ET — TP2 window not yet open.`)
+  }
+  lines.push('')
+
+  lines.push(`### Auto Exit — ${autoExit} ET`)
+  if (time >= autoExit) {
+    lines.push(`> ⚠️ **EXIT NOW** — ${autoExit} ET reached.`)
+  } else {
+    lines.push(`> Hard exit at ${autoExit} ET — close position before then.`)
   }
   lines.push('')
 
@@ -361,7 +372,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     lines.push(`- ${bad(k4Reason)}`)
     lines.push('')
     const gex    = extractGexData(ctx.marketSummary)
-    lines.push(positionAdvisory(ctx.openTrades[0], ctx, gex, p))
+    lines.push(positionAdvisory(ctx.openTrades[0], ctx, gex, cfg))
     lines.push('')
     lines.push('---')
     lines.push('**Status: HALT** — No new positions while a position is open.')
@@ -370,6 +381,13 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
 
   lines.push('- ' + ok('All clear'))
   lines.push('')
+
+  // Entry window: no new positions after entryWindowEnd — halt immediately, skip all analysis
+  const entryEnd = cfg.entryWindowEnd ?? cfg.scanWindowEnd
+  if (time > entryEnd) {
+    lines.push(`**Status: HALT** — Entry window closed (past ${entryEnd} ET).`)
+    return { result: 'HALT', haltReason: `Past entry window (${entryEnd} ET)`, backtestSummary: `HALT — past ${entryEnd} ET`, markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
+  }
 
   // Need ≥2 closed candles
   const candles = ctx.todayCandles

@@ -1,6 +1,7 @@
 {
   "scanWindowStart": "10:15",
-  "scanWindowEnd": "14:00",
+  "scanWindowEnd":   "15:00",
+  "entryWindowEnd":  "14:00",
   "params": {
     "rsiOverbought": 70,
     "rsiOverboughtConfirm": 65,

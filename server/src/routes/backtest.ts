@@ -34,6 +34,12 @@ function addFiveMinutes(hhmm: string): string {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
+function subtractFiveMinutes(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  const total  = h * 60 + m - 5
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
 function toSpxCandle(c: ReplayCandle, date: string): SpxCandle {
   return {
     t: `${date}T${c.t}`,
@@ -73,12 +79,18 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
     const marketSummary                  = replay.market_summary ?? null
 
     const { service, config } = await getRuleServiceAndConfig(ruleId)
-    const params = (config as { params: Record<string, number> }).params
+    const cfg        = config as { scanWindowStart: string; scanWindowEnd: string; params: Record<string, number> }
+    const params     = cfg.params
+    const scanStart  = cfg.scanWindowStart ?? '10:15'
+    const scanEnd    = cfg.scanWindowEnd   ?? '15:00'
 
-    // Scan window: bar open times 10:10–13:55 → eval times 10:15–14:00
+    // Derive bar open times from config: last bar closes at scanEnd, first bar closes at scanStart
+    const firstBarTime = subtractFiveMinutes(scanStart)  // e.g. "10:10"
+    const lastBarTime  = subtractFiveMinutes(scanEnd)    // e.g. "14:55"
+
     const scanCandles = allCandles.filter(c => {
       const t = c.t.slice(-5)
-      return t >= '10:10' && t <= '13:55'
+      return t >= firstBarTime && t <= lastBarTime
     })
 
     interface ActivePos {
@@ -130,7 +142,8 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
         if      (currentPrice >= pos.entryCredit * (params.sl1Multiplier ?? 2.0))   exitReason = 'SL1'
         else if (currentPrice <= pos.entryCredit * (params.tp1Multiplier ?? 0.3))   exitReason = 'TP1'
         else if (evalTime >= '13:45' && currentPrice <= pos.entryCredit * (params.tp2Multiplier ?? 0.5)) exitReason = 'TP2'
-        else if (sl2) exitReason = 'SL2'
+        else if (sl2)              exitReason = 'SL2'
+        else if (evalTime >= scanEnd) exitReason = 'FORCED'
 
         if (exitReason) {
           const pnl = Math.round((pos.entryCredit - currentPrice) * 100 * 100) / 100
