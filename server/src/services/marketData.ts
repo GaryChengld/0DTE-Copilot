@@ -775,3 +775,16 @@ export async function fetchSpxPrevDayClose(): Promise<number | null> {
   const closes = await fetchDailyCloses("^GSPC", 5);
   return closes.length > 0 ? closes[closes.length - 1] : null;
 }
+
+// Fetch last `days` VIX daily closes up to a specific historical date (for backtest).
+export async function fetchVixDailyClosesUpTo(days: number, upToDate: Date): Promise<number[]> {
+  const closes = await fetchDailyClosesUpTo("^VIX", Math.ceil(days * 1.6), upToDate);
+  return closes.slice(-days);
+}
+
+// Fetch the SPX daily close for the trading day before `date` (for backtest K6 gap check).
+export async function fetchSpxPrevDayCloseFor(date: Date): Promise<number | null> {
+  const closes = await fetchDailyClosesUpTo("^GSPC", 5, date);
+  // closes includes the target date; second-to-last is the prior trading day
+  return closes.length >= 2 ? closes[closes.length - 2] : null;
+}

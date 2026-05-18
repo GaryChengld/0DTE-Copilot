@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Check, Copy, Loader2, Pencil, Trash2 } from "lucide-react";
 import SpxCandleChart from "./SpxCandleChart";
+import BacktestPanel from "./BacktestPanel";
 import HistoryCalendar from "./HistoryCalendar";
 import JournalModal from "./JournalModal";
 import { fetchSpxCandlesByDate, type SpxCandle } from "../api/spxCandles";
@@ -375,7 +376,7 @@ function ReplayView({ date, active }: { date: string; active: boolean }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-type RightTab = "advices" | "journal" | "replay";
+type RightTab = "advices" | "journal" | "replay" | "backtest";
 
 export default function HistoryPanel({ visible }: { visible: boolean }) {
   const today = todayET();
@@ -538,7 +539,7 @@ export default function HistoryPanel({ visible }: { visible: boolean }) {
           className="flex shrink-0 border-b px-3 pt-2 gap-1"
           style={{ borderColor: "var(--border)" }}
         >
-          {(["advices", "journal", "replay"] as RightTab[]).map((tab) => (
+          {(["advices", "journal", "replay", "backtest"] as RightTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setRightTab(tab)}
@@ -549,7 +550,10 @@ export default function HistoryPanel({ visible }: { visible: boolean }) {
               }`}
               style={{ color: rightTab === tab ? undefined : "var(--text-muted)" }}
             >
-              {tab === "advices" ? "AI Advice" : tab === "journal" ? "Journal" : "Replay"}
+              {tab === "advices" ? "AI Advice"
+                : tab === "journal" ? "Journal"
+                : tab === "replay" ? "Replay"
+                : "Backtest"}
             </button>
           ))}
           <span
@@ -578,6 +582,9 @@ export default function HistoryPanel({ visible }: { visible: boolean }) {
         </div>
         <div className="flex-1 overflow-y-auto p-4 flex flex-col" style={{ display: rightTab === "replay" ? undefined : "none" }}>
           <ReplayView date={selectedDate} active={rightTab === "replay"} />
+        </div>
+        <div className="flex-1 overflow-y-auto flex flex-col" style={{ display: rightTab === "backtest" ? undefined : "none" }}>
+          <BacktestPanel date={selectedDate} active={rightTab === "backtest"} />
         </div>
       </div>
 

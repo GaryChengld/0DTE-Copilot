@@ -118,3 +118,28 @@ export function remainingHoursToClose(): number {
 export function currentEtDate(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
+
+// Hours from a "HH:MM" bar time string until 16:00 ET (clamped to 0).
+export function remainingHoursFromBarTime(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return Math.max(0, (16 * 60 - (h * 60 + m)) / 60)
+}
+
+// Theoretical price of an existing spread position using Black-Scholes.
+// direction/shortStrike/longStrike come from the original entry.
+export function computeCurrentSpreadPrice(
+  spx: number,
+  direction: Direction,
+  shortStrike: number,
+  longStrike:  number,
+  vix: number,
+  remainingHours: number,
+  r = 0.04
+): number {
+  const T     = remainingHours / 6.5 / 252
+  const sigma = vix / 100
+  const price = direction === 'bear_call'
+    ? bsCall(spx, shortStrike, T, r, sigma) - bsCall(spx, longStrike, T, r, sigma)
+    : bsPut(spx,  shortStrike, T, r, sigma) - bsPut(spx,  longStrike, T, r, sigma)
+  return Math.max(0, Math.round(price * 100) / 100)
+}

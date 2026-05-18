@@ -1,9 +1,9 @@
-import type { RuleService, EvalContext, EvaluationResult } from '../types.js'
+import type { RuleService, EvalContext, EvaluationResult, VoterDetail } from '../types.js'
 import type { TradeWithExits } from '../../db/tradeRepository.js'
 import {
   computeRsi5, computeCandleShadows, computeOpeningGap,
   computeVixChange, computeVix20MA, computeSpreadCredit,
-  extractGexData, currentEtTime, remainingHoursToClose,
+  extractGexData, currentEtTime, remainingHoursToClose, remainingHoursFromBarTime,
   type Direction,
 } from '../calculations.js'
 
@@ -39,12 +39,17 @@ type VoterResult = { pass: boolean; details: string[] }
 const ok  = (s: string) => `✅ ${s}`
 const bad = (s: string) => `❌ ${s}`
 
+const EMPTY_DETAIL: VoterDetail = {
+  bullPut:  { t: false, o: false, b: false },
+  bearCall: { t: false, o: false, b: false },
+}
+
 // ── Kill Switches (Layer 1) ───────────────────────────────────────────────────
 
 function checkKillSwitches(ctx: EvalContext, cfg: ThreeVoterConfig): string[] {
   const { params: p, scanWindowStart, scanWindowEnd } = cfg
   const reasons: string[] = []
-  const time   = currentEtTime()
+  const time   = ctx.currentTimeET ?? currentEtTime()
   const vix    = ctx.vixReadings.at(-1) ?? 0
   const vixChg = computeVixChange(vix, ctx.vixDailyCloses.at(-1) ?? 0)
 
@@ -245,7 +250,7 @@ function positionAdvisory(
 ): string {
   const dir: Direction = trade.optionType === 'CALL' ? 'bear_call' : 'bull_put'
   const credit = trade.entryPrice ?? 0
-  const time   = currentEtTime()
+  const time   = ctx.currentTimeET ?? currentEtTime()
   const lines: string[] = []
 
   lines.push('## Open Position')
@@ -257,7 +262,6 @@ function positionAdvisory(
   lines.push('## Exit Condition Check')
   lines.push('')
 
-  // TP2 — time target
   lines.push('### TP2 — Time Target (13:45 ET)')
   if (time >= '13:45') {
     lines.push(`> ⚠️ **CONSIDER TAKING PROFIT** — ${time} ET ≥ 13:45 ET.`)
@@ -267,7 +271,6 @@ function positionAdvisory(
   }
   lines.push('')
 
-  // SL2 — ADD reversal
   lines.push('### SL2 — ADD Reversal')
   const last3 = ctx.addReadings.slice(-3)
   if (last3.length < 2) {
@@ -283,7 +286,6 @@ function positionAdvisory(
   }
   lines.push('')
 
-  // TP3 — Voter O reversal
   lines.push('### TP3 — Voter O Reversal')
   if (!gex) {
     lines.push('> GEX data unavailable — cannot evaluate TP3.')
@@ -308,7 +310,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
   const cfg  = config as ThreeVoterConfig
   const { params: p } = cfg
   const lines: string[] = []
-  const time = currentEtTime()
+  const time = ctx.currentTimeET ?? currentEtTime()
 
   lines.push(`# Three-Voter Evaluation — v1.3 | ${time} ET`)
   lines.push('')
@@ -324,7 +326,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     otherKills.forEach(r => lines.push(`- ${bad(r)}`))
     lines.push('')
     lines.push('**Status: HALT**')
-    return { result: 'HALT', markdown: lines.join('\n') }
+    return { result: 'HALT', markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
   }
 
   if (k4Reason) {
@@ -336,7 +338,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     lines.push('')
     lines.push('---')
     lines.push('**Status: HALT** — No new positions while a position is open.')
-    return { result: 'HALT', markdown: lines.join('\n') }
+    return { result: 'HALT', markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
   }
 
   lines.push('- ' + ok('All clear'))
@@ -347,7 +349,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
   if (candles.length < 2) {
     lines.push('## Insufficient Data')
     lines.push('Need ≥2 closed 5-min candles. Market may not have opened yet.')
-    return { result: 'WAIT', markdown: lines.join('\n') }
+    return { result: 'WAIT', markdown: lines.join('\n'), voterDetail: EMPTY_DETAIL }
   }
 
   // Layer 2: ADD mode
@@ -365,8 +367,24 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
   lines.push(`- **Evaluation direction: ${direction === 'bear_call' ? 'Bear Call' : 'Bull Put'}**`)
   lines.push('')
 
+  const gex    = extractGexData(ctx.marketSummary)
+  const vix    = ctx.vixReadings.at(-1) ?? 0
+  const vixChg = computeVixChange(vix, ctx.vixDailyCloses.at(-1) ?? 0)
+
+  // Both-direction voters for voterDetail display (trend-aligned mode — no directional confirmation)
+  const tBP = voterT(ctx, 'bull_put',  p)
+  const oBP = voterO(spx, 'bull_put',  'trend-aligned', gex, vix, ctx.vixDailyCloses, p)
+  const bBP = voterB('bull_put',  'trend-aligned', ctx.addReadings, vixChg, 2, p)
+  const tBC = voterT(ctx, 'bear_call', p)
+  const oBC = voterO(spx, 'bear_call', 'trend-aligned', gex, vix, ctx.vixDailyCloses, p)
+  const bBC = voterB('bear_call', 'trend-aligned', ctx.addReadings, vixChg, 2, p)
+
+  const voterDetail: VoterDetail = {
+    bullPut:  { t: tBP.pass, o: oBP.pass, b: bBP.pass },
+    bearCall: { t: tBC.pass, o: oBC.pass, b: bBC.pass },
+  }
+
   // O directional confirmation early exit (oscillation + conflict modes)
-  const gex = extractGexData(ctx.marketSummary)
   if (mode !== 'trend-aligned' && gex) {
     const dc = direction === 'bear_call' ? spx > gex.gamma_flip : spx < gex.gamma_flip
     if (!dc) {
@@ -377,14 +395,11 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
       )
       lines.push('')
       lines.push('**Status: WAIT** — Directional confirmation required in oscillation/conflict mode.')
-      return { result: 'WAIT', direction, addMode: mode, markdown: lines.join('\n') }
+      return { result: 'WAIT', direction, addMode: mode, markdown: lines.join('\n'), voterDetail }
     }
   }
 
-  const vix    = ctx.vixReadings.at(-1) ?? 0
-  const vixChg = computeVixChange(vix, ctx.vixDailyCloses.at(-1) ?? 0)
-
-  // Layer 3: voters
+  // Layer 3: voters (mode-correct direction and bThr for GO decision)
   const tResult = voterT(ctx, direction, p)
   lines.push(`## Voter T — Technical ${tResult.pass ? '✅ PASS' : '❌ FAIL'}`)
   tResult.details.forEach(d => lines.push(`- ${d}`))
@@ -416,7 +431,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
   lines.push('')
 
   if (votes >= 2 && o3Pass) {
-    const hrs = remainingHoursToClose()
+    const hrs = ctx.currentTimeET ? remainingHoursFromBarTime(ctx.currentTimeET) : remainingHoursToClose()
     const { shortStrike, longStrike, credit } = computeSpreadCredit(spx, direction, vix, hrs, p.riskFreeRate)
     lines.push(`# ✅ GO — ${direction === 'bear_call' ? 'Bear Call' : 'Bull Put'}`)
     lines.push('')
@@ -427,17 +442,17 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
     lines.push(`- **Stop Loss (SL1):** spread ≥ $${(credit * p.sl1Multiplier).toFixed(2)} (${(p.sl1Multiplier * 100).toFixed(0)}% loss)`)
     lines.push(`- **Take Profit (TP1):** spread ≤ $${(credit * p.tp1Multiplier).toFixed(2)} (${((1 - p.tp1Multiplier) * 100).toFixed(0)}% profit)`)
     lines.push(`- **Take Profit (TP2):** spread ≤ $${(credit * p.tp2Multiplier).toFixed(2)} after 13:45 ET`)
-    return { result: 'GO', direction, addMode: mode, shortStrike, longStrike, estimatedCredit: credit, markdown: lines.join('\n') }
+    return { result: 'GO', direction, addMode: mode, shortStrike, longStrike, estimatedCredit: credit, markdown: lines.join('\n'), voterDetail }
   }
 
   if (votes >= 1 || (votes === 2 && !o3Pass)) {
     const reason = votes >= 2 && !o3Pass ? ' (O3 mandatory — did not pass)' : ''
     lines.push(`# ⏳ WAIT — ${votes}/3 voters pass${reason}`)
-    return { result: 'WAIT', direction, addMode: mode, markdown: lines.join('\n') }
+    return { result: 'WAIT', direction, addMode: mode, markdown: lines.join('\n'), voterDetail }
   }
 
   lines.push('# ❌ NO-GO — 0/3 voters pass')
-  return { result: 'NO-GO', direction, addMode: mode, markdown: lines.join('\n') }
+  return { result: 'NO-GO', direction, addMode: mode, markdown: lines.join('\n'), voterDetail }
 }
 
 export const threeVoterV1Service: RuleService = { evaluate }

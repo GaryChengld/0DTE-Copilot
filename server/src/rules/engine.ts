@@ -32,6 +32,19 @@ export function listRules(): RuleInfo[] {
     .map(({ id, name, version, description }) => ({ id, name, version, description }))
 }
 
+export async function getRuleServiceAndConfig(
+  ruleId: string
+): Promise<{ service: RuleService; config: unknown }> {
+  const entry = loadIndex().find(e => e.id === ruleId)
+  if (!entry)         throw new Error(`Unknown rule: ${ruleId}`)
+  if (!entry.enabled) throw new Error(`Rule '${ruleId}' is disabled`)
+  const loader = SERVICE_REGISTRY[entry.service]
+  if (!loader) throw new Error(`No service registered for: ${entry.service}`)
+  const service = await loader()
+  const config  = JSON.parse(readFileSync(join(CONFIGS, entry.configFile), 'utf-8'))
+  return { service, config }
+}
+
 export async function evaluateRule(ruleId: string, ctx: EvalContext): Promise<EvaluationResult> {
   const entry = loadIndex().find(e => e.id === ruleId)
   if (!entry)         throw new Error(`Unknown rule: ${ruleId}`)
