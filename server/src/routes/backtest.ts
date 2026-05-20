@@ -211,7 +211,7 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
           bars.push({
             time:         evalTime,
             summary:      evalResult.backtestSummary ?? evalResult.result,
-            voterDetail:  evalResult.voterDetail,
+            markdown:     evalResult.markdown,
             decision:     'GO',
             direction:    evalResult.direction,
             hasPosition:  false,
@@ -224,7 +224,7 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
           bars.push({
             time:        evalTime,
             summary:     evalResult.backtestSummary ?? evalResult.result,
-            voterDetail: evalResult.voterDetail,
+            markdown:    evalResult.markdown,
             decision:    evalResult.result,
             direction:   evalResult.direction,
             hasPosition: false,

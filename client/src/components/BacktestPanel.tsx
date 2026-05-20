@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Play } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { listRules, type RuleInfo } from "../api/rules";
 import {
   runBacktest,
@@ -35,9 +37,17 @@ function noteText(bar: BacktestBarRow): string {
   return ""
 }
 
-// ── Bar table ─────────────────────────────────────────────────────────────────
+// ── Left: Bar grid ────────────────────────────────────────────────────────────
 
-function BarTable({ bars }: { bars: BacktestBarRow[] }) {
+function BarTable({
+  bars,
+  selectedIdx,
+  onSelect,
+}: {
+  bars: BacktestBarRow[]
+  selectedIdx: number | null
+  onSelect: (i: number) => void
+}) {
   return (
     <div className="overflow-x-auto text-xs">
       <table className="w-full border-collapse">
@@ -50,13 +60,26 @@ function BarTable({ bars }: { bars: BacktestBarRow[] }) {
         </thead>
         <tbody>
           {bars.map((bar, i) => {
-            const rowBg    = bar.isEntry ? "#0d2b1a" : bar.isExit ? "#2b0d0d" : undefined
+            const isSelected = selectedIdx === i
+            const rowBg = isSelected
+              ? "#1e3a5f"
+              : bar.isEntry ? "#0d2b1a"
+              : bar.isExit  ? "#2b0d0d"
+              : undefined
             const decColor = bar.isExit
               ? (EXIT_COLOR[bar.exitReason ?? ""] ?? "white")
               : DECISION_COLOR[bar.decision] ?? "var(--text-muted)"
 
             return (
-              <tr key={i} style={{ background: rowBg, borderTop: "1px solid var(--border)" }}>
+              <tr
+                key={i}
+                onClick={() => onSelect(i)}
+                style={{
+                  background: rowBg,
+                  borderTop: "1px solid var(--border)",
+                  cursor: "pointer",
+                }}
+              >
                 <td className="px-2 py-0.5 font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
                   {bar.time}
                 </td>
@@ -71,6 +94,63 @@ function BarTable({ bars }: { bars: BacktestBarRow[] }) {
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+// ── Right: Bar detail panel ───────────────────────────────────────────────────
+
+function PositionInfo({ bar }: { bar: BacktestBarRow }) {
+  if (!bar.isEntry && !bar.isExit && !bar.hasPosition) return null
+  const dirLabel = bar.direction === "bear_call" ? "Bear Call" : "Bull Put"
+  return (
+    <div className="rounded p-2 text-xs mb-3" style={{ background: "#1c2333" }}>
+      {bar.isEntry && bar.shortStrike != null && (
+        <>
+          <div style={{ color: "#4ade80" }}>Entry — {dirLabel} {bar.shortStrike}/{bar.longStrike}</div>
+          <div style={{ color: "var(--text-muted)" }}>Credit: ${bar.entryCredit?.toFixed(2)}</div>
+        </>
+      )}
+      {bar.isExit && (
+        <>
+          <div style={{ color: EXIT_COLOR[bar.exitReason ?? ""] ?? "white" }}>Exit — {bar.exitReason}</div>
+          {bar.shortStrike != null && (
+            <div style={{ color: "var(--text-muted)" }}>
+              {dirLabel} {bar.shortStrike}/{bar.longStrike} · Entry ${bar.entryCredit?.toFixed(2)} → Exit ${bar.currentPrice?.toFixed(2)}
+            </div>
+          )}
+        </>
+      )}
+      {bar.hasPosition && !bar.isEntry && !bar.isExit && bar.currentPrice != null && (
+        <div style={{ color: "var(--text-muted)" }}>
+          Holding {dirLabel} {bar.shortStrike}/{bar.longStrike} · Current ${bar.currentPrice.toFixed(2)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BarDetail({ bar }: { bar: BacktestBarRow | null }) {
+  if (!bar) {
+    return (
+      <div className="flex items-center justify-center h-full text-xs" style={{ color: "var(--text-muted)" }}>
+        Click a bar to see details.
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-y-auto rounded p-4" style={{ background: "#0d1117", border: "1px solid var(--border)" }}>
+      <PositionInfo bar={bar} />
+      {bar.markdown ? (
+        <div className="prose prose-invert max-w-none text-sm">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{bar.markdown}</ReactMarkdown>
+        </div>
+      ) : (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          No evaluation detail for this bar.
+        </p>
+      )}
     </div>
   )
 }
@@ -141,12 +221,13 @@ function TradeSummary({ trades, totalPnl }: { trades: BacktestTrade[]; totalPnl:
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function BacktestPanel({ date, active }: { date: string; active: boolean }) {
-  const [rules, setRules]       = useState<RuleInfo[]>([])
-  const [selected, setSelected] = useState("")
-  const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState<BacktestResponse | null>(null)
-  const [error, setError]       = useState<string | null>(null)
-  const lastDateRef             = useRef<string | null>(null)
+  const [rules, setRules]           = useState<RuleInfo[]>([])
+  const [selected, setSelected]     = useState("")
+  const [loading, setLoading]       = useState(false)
+  const [result, setResult]         = useState<BacktestResponse | null>(null)
+  const [error, setError]           = useState<string | null>(null)
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+  const lastDateRef                 = useRef<string | null>(null)
 
   useEffect(() => {
     listRules()
@@ -159,12 +240,13 @@ export default function BacktestPanel({ date, active }: { date: string; active: 
       lastDateRef.current = date
       setResult(null)
       setError(null)
+      setSelectedIdx(null)
     }
   }, [date])
 
   async function handleRun() {
     if (!selected || !date) return
-    setLoading(true); setResult(null); setError(null)
+    setLoading(true); setResult(null); setError(null); setSelectedIdx(null)
     try {
       setResult(await runBacktest(selected, date))
     } catch (e) {
@@ -182,8 +264,11 @@ export default function BacktestPanel({ date, active }: { date: string; active: 
     )
   }
 
+  const selectedBar = result && selectedIdx !== null ? result.bars[selectedIdx] : null
+
   return (
     <div className="flex flex-col h-full gap-3 p-3">
+      {/* Toolbar */}
       <div className="flex items-center gap-2 shrink-0">
         <select
           value={selected}
@@ -218,9 +303,24 @@ export default function BacktestPanel({ date, active }: { date: string; active: 
       )}
 
       {result && (
-        <div className="flex-1 overflow-y-auto">
-          <BarTable bars={result.bars} />
-          <TradeSummary trades={result.trades} totalPnl={result.totalPnl} />
+        <div className="flex flex-1 gap-3 min-h-0">
+          {/* Left: bar grid + trade summary */}
+          <div
+            className="flex flex-col overflow-y-auto shrink-0"
+            style={{ width: "55%", borderRight: "1px solid var(--border)" }}
+          >
+            <BarTable
+              bars={result.bars}
+              selectedIdx={selectedIdx}
+              onSelect={setSelectedIdx}
+            />
+            <TradeSummary trades={result.trades} totalPnl={result.totalPnl} />
+          </div>
+
+          {/* Right: detail panel */}
+          <div className="flex-1 min-h-0 overflow-y-auto" style={{ borderLeft: "none" }}>
+            <BarDetail bar={selectedBar} />
+          </div>
         </div>
       )}
     </div>
