@@ -46,45 +46,54 @@ export function computeVix20MA(closes: number[]): number | null {
   return last20.reduce((a, b) => a + b, 0) / 20
 }
 
-// Short strike selection. Spec Section 7.
-export function computeShortStrike(spx: number, direction: Direction): number {
-  return direction === 'bear_call' ? Math.ceil((spx + 37) / 5) * 5 : Math.floor((spx - 37) / 5) * 5
+// Short strike selection — OTM distance depends on VIX. Spec Section 7.
+function otmDistancePt(vix: number): number {
+  return vix < 15 ? 25 : vix < 20 ? 35 : 45
 }
 
-// Normal CDF approximation. Spec Section 8.
-function normalCdf(x: number): number {
-  return 1 / (1 + Math.exp(-1.7 * x))
+export function computeShortStrike(spx: number, direction: Direction, vix: number): number {
+  const d = otmDistancePt(vix)
+  return direction === 'bear_call'
+    ? Math.ceil((spx + d) / 5) * 5
+    : Math.floor((spx - d) / 5) * 5
 }
 
-function bsCall(S: number, K: number, T: number, r: number, sigma: number): number {
-  if (T <= 0) return Math.max(S - K, 0)
-  const d1 = (Math.log(S / K) + (r + (sigma * sigma) / 2) * T) / (sigma * Math.sqrt(T))
-  return S * normalCdf(d1) - K * Math.exp(-r * T) * normalCdf(d1 - sigma * Math.sqrt(T))
+
+// Core pricing: credit-spread-pricing.md — Width × 0.3 × exp(−3.8 × N) × C(T) × M(T) × A(T)
+// EM = SPX × (VIX/100) × sqrt(T_min / (252×390)),  N = D / EM
+// C(T) = 1.34 × (T/138)^0.45, clamped to [0.8, 2.1]
+// M(T) = 1 + 0.22 × exp(-(T-240)² / (2×55²))   midday stickiness
+// A(T) = 1 + 0.22 × exp(-(T-150)² / (2×45²))   early-afternoon support
+// Capped at width so a deep-ITM position never exceeds max payout.
+function spreadPrice(
+  spx: number, direction: Direction,
+  shortStrike: number, longStrike: number,
+  vix: number, remainingHours: number,
+): number {
+  const T = remainingHours * 60
+  if (T <= 0) return 0
+  const width = Math.abs(longStrike - shortStrike)
+  const em    = spx * (vix / 100) * Math.sqrt(T / (252 * 390))
+  const D     = direction === 'bear_call' ? shortStrike - spx : spx - shortStrike
+  const N     = D / em
+  if (N < 0) return Math.max(0, Math.min(-D, width))   // ITM: intrinsic value
+  const cT    = Math.min(Math.max(1.34 * Math.pow(T / 138, 0.45), 0.8), 2.1)
+  const mT    = 1 + 0.22 * Math.exp(-Math.pow(T - 240, 2) / (2 * 55 * 55))
+  const aT    = 1 + 0.22 * Math.exp(-Math.pow(T - 150, 2) / (2 * 45 * 45))
+  return Math.min(width * 0.3 * Math.exp(-3.8 * N) * cT * mT * aT, width)
 }
 
-function bsPut(S: number, K: number, T: number, r: number, sigma: number): number {
-  if (T <= 0) return Math.max(K - S, 0)
-  const d1 = (Math.log(S / K) + (r + (sigma * sigma) / 2) * T) / (sigma * Math.sqrt(T))
-  const d2 = d1 - sigma * Math.sqrt(T)
-  return K * Math.exp(-r * T) * normalCdf(-d2) - S * normalCdf(-d1)
-}
-
-// 10-point spread credit estimate. Spec Section 8. remainingHours = hours until 16:00 ET.
+// Entry credit for a new spread — strikes auto-selected by VIX. remainingHours = hours until 16:00 ET.
 export function computeSpreadCredit(
   spx: number,
   direction: Direction,
   vix: number,
   remainingHours: number,
-  r = 0.04,
+  _r = 0.04,
 ): { shortStrike: number; longStrike: number; credit: number } {
-  const K = computeShortStrike(spx, direction)
-  const Kl = direction === 'bear_call' ? K + 10 : K - 10
-  const T = remainingHours / 6.5 / 252
-  const sigma = vix / 100
-  const credit =
-    direction === 'bear_call'
-      ? bsCall(spx, K, T, r, sigma) - bsCall(spx, Kl, T, r, sigma)
-      : bsPut(spx, K, T, r, sigma) - bsPut(spx, Kl, T, r, sigma)
+  const K      = computeShortStrike(spx, direction, vix)
+  const Kl     = direction === 'bear_call' ? K + 10 : K - 10
+  const credit = spreadPrice(spx, direction, K, Kl, vix, remainingHours)
   return { shortStrike: K, longStrike: Kl, credit: Math.max(0, Math.round(credit * 100) / 100) }
 }
 
@@ -132,8 +141,7 @@ export function remainingHoursFromBarTime(hhmm: string): number {
   return Math.max(0, (16 * 60 - (h * 60 + m)) / 60)
 }
 
-// Theoretical price of an existing spread position using Black-Scholes.
-// direction/shortStrike/longStrike come from the original entry.
+// Mark-to-market price of an open spread using original strikes and current SPX/VIX.
 export function computeCurrentSpreadPrice(
   spx: number,
   direction: Direction,
@@ -141,13 +149,7 @@ export function computeCurrentSpreadPrice(
   longStrike: number,
   vix: number,
   remainingHours: number,
-  r = 0.04,
+  _r = 0.04,
 ): number {
-  const T = remainingHours / 6.5 / 252
-  const sigma = vix / 100
-  const price =
-    direction === 'bear_call'
-      ? bsCall(spx, shortStrike, T, r, sigma) - bsCall(spx, longStrike, T, r, sigma)
-      : bsPut(spx, shortStrike, T, r, sigma) - bsPut(spx, longStrike, T, r, sigma)
-  return Math.max(0, Math.round(price * 100) / 100)
+  return Math.max(0, Math.round(spreadPrice(spx, direction, shortStrike, longStrike, vix, remainingHours) * 100) / 100)
 }

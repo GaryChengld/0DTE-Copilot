@@ -147,19 +147,19 @@ VIX Current ≤ VIX_20MA × 0.85 → fail (IV extremely compressed)
 
 ---
 
-### 7. Short Strike Selection (Target Delta ≈ 0.10)
+### 7. Short Strike Selection (OTM Distance by VIX)
 
-```
-Bear Call short strike = ceil((SPX + 37) / 5) × 5
-Bull Put  short strike = floor((SPX − 37) / 5) × 5
-```
+| VIX Range | Min OTM (D_min) | Bull Put short strike | Bear Call short strike |
+|-----------|-----------------|----------------------|------------------------|
+| < 15 | 25pt | `floor((SPX − 25) / 5) × 5` | `ceil((SPX + 25) / 5) × 5` |
+| 15–20 | 35pt | `floor((SPX − 35) / 5) × 5` | `ceil((SPX + 35) / 5) × 5` |
+| ≥ 20 | 45pt | `floor((SPX − 45) / 5) × 5` | `ceil((SPX + 45) / 5) × 5` |
 
-At SPX levels 7000–7500, delta 0.10 corresponds to approximately 35–40 points OTM.
-The system uses 65 points as the baseline, rounded to the nearest 5-point strike.
+**Long strike** = Short strike ∓ 10pt (fixed 10-point spread width).
 
 ---
 
-### 8. Theoretical Option Credit Estimate (Black-Scholes Approximation)
+### 8. Theoretical Option Credit Estimate (Black-Scholes with IV Adjustment)
 
 Used when no live options chain is available.
 
@@ -167,46 +167,65 @@ Used when no live options chain is available.
 
 ```
 S = SPX current price
-K = short strike
-T = time to expiry (annualized) = remaining hours / 6.5 / 252
-r = risk-free rate (use 0.04)
-σ_annual = VIX / 100
+K = short strike (Section 7)
+T = remaining minutes to 16:15 ET / (252 × 6.5 × 60)
+r = 0.04
+```
+
+**IV multiplier by OTM % and direction** (calibrated at VIX = 18, SPX = 7350, 10:30 ET):
+
+| OTM % | Bull Put multiplier | Bear Call multiplier |
+|--------|---------------------|----------------------|
+| < 0.40% | 1.68× | 1.70× |
+| 0.40–0.70% | 1.95× | 1.85× |
+| 0.70–1.00% | 2.20× | 2.00× |
+| > 1.00% | 2.45× | 2.15× |
+
+```
+OTM % = |K − S| / S
+σ_eff = (VIX / 100) × multiplier
 ```
 
 **d1 and d2:**
 
 ```
-d1 = [ln(S/K) + (r + σ_annual²/2) × T] / (σ_annual × √T)
-d2 = d1 − σ_annual × √T
+d1 = [ln(S/K) + (r + σ_eff² / 2) × T] / (σ_eff × √T)
+d2 = d1 − σ_eff × √T
 ```
 
-**Call theoretical price:**
+**Call and Put theoretical prices:**
 
 ```
-C = S × N(d1) − K × e^(−rT) × N(d2)
-```
-
-**Put theoretical price:**
-
-```
-P = K × e^(−rT) × N(−d2) − S × N(−d1)
-```
-
-**Normal CDF approximation:**
-
-```
-N(x) ≈ 1 / (1 + e^(−1.7 × x))
+Call(K) = S × N(d1)  − K × e^(−rT) × N(d2)
+Put(K)  = K × e^(−rT) × N(−d2) − S × N(−d1)
 ```
 
 **10-point spread credit estimate:**
 
 ```
-Bear Call Spread Credit = C(K_short) − C(K_short + 10)
-Bull Put  Spread Credit = P(K_short) − P(K_short − 10)
+Bear Call Spread Credit = Call(K_short) − Call(K_short + 10)
+Bull Put  Spread Credit = Put(K_short)  − Put(K_short − 10)
 ```
 
-Note: When IVP is below 25%, this estimate may overstate credit by 15–30%.
-Treat estimates in the $0.80–$0.90 range as marginal when IVP is low.
+**N(x) — Horner polynomial approximation (Abramowitz & Stegun 26.2.17, accuracy ±0.0001):**
+
+```
+t    = 1 / (1 + 0.2316419 × |x|)
+poly = t × (0.319381530
+       + t × (−0.356563782
+       + t × ( 1.781477937
+       + t × (−1.821255978
+       + t ×   1.330274429))))
+φ(x) = exp(−x² / 2) / √(2π)
+
+N(x) = 1 − φ(x) × poly    if x ≥ 0
+N(x) = φ(|x|) × poly       if x < 0
+```
+
+> **Note on IV multipliers**: Call skew historically assumed to be smaller than put skew.
+> Calibration against actual market prices shows the gap is narrower than expected,
+> likely driven by elevated 0DTE call buying activity. Recalibrate as more data points
+> are collected across different VIX regimes.
 
 ---
 
