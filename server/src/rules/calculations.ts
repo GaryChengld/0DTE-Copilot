@@ -141,6 +141,35 @@ export function remainingHoursFromBarTime(hhmm: string): number {
   return Math.max(0, (16 * 60 - (h * 60 + m)) / 60)
 }
 
+// EMA(N) seeded from the first N values, then Wilder-style smoothing.
+function ema(values: number[], period: number): number[] {
+  if (values.length < period) return []
+  const k = 2 / (period + 1)
+  let avg = values.slice(0, period).reduce((a, b) => a + b, 0) / period
+  const out = [avg]
+  for (let i = period; i < values.length; i++) {
+    avg = values[i] * k + avg * (1 - k)
+    out.push(avg)
+  }
+  return out
+}
+
+// MACD(12,26,9) from a closes array. Returns null when fewer than 34 values are available.
+export function computeMacd(
+  closes: number[],
+): { macdLine: number; signalLine: number; histogram: number } | null {
+  if (closes.length < 34) return null
+  const e12    = ema(closes, 12)
+  const e26    = ema(closes, 26)
+  const offset = e12.length - e26.length   // = 14
+  const macdSeries = e26.map((v, i) => e12[i + offset] - v)
+  if (macdSeries.length < 9) return null
+  const sig = ema(macdSeries, 9)
+  const ml  = macdSeries.at(-1)!
+  const sl  = sig.at(-1)!
+  return { macdLine: ml, signalLine: sl, histogram: ml - sl }
+}
+
 // Mark-to-market price of an open spread using original strikes and current SPX/VIX.
 export function computeCurrentSpreadPrice(
   spx: number,

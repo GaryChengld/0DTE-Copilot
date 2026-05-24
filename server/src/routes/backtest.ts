@@ -28,18 +28,6 @@ interface ReplayData {
   market_summary?: unknown
 }
 
-function addFiveMinutes(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  const total  = h * 60 + m + 5
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-}
-
-function subtractFiveMinutes(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  const total  = h * 60 + m - 5
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-}
-
 function toSpxCandle(c: ReplayCandle, date: string): SpxCandle {
   return {
     t: `${date}T${c.t}`,
@@ -84,13 +72,10 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
     const scanStart  = cfg.scanWindowStart ?? '10:15'
     const scanEnd    = cfg.scanWindowEnd   ?? '15:00'
 
-    // Derive bar open times from config: last bar closes at scanEnd, first bar closes at scanStart
-    const firstBarTime = subtractFiveMinutes(scanStart)  // e.g. "10:10"
-    const lastBarTime  = subtractFiveMinutes(scanEnd)    // e.g. "14:55"
-
+    // t is bar close time; scan window is [scanStart, scanEnd] inclusive
     const scanCandles = allCandles.filter(c => {
       const t = c.t.slice(-5)
-      return t >= firstBarTime && t <= lastBarTime
+      return t >= scanStart && t <= scanEnd
     })
 
     interface ActivePos {
@@ -109,12 +94,12 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
 
     for (let i = 0; i < scanCandles.length; i++) {
       const barCandle = scanCandles[i]
-      const barTime   = barCandle.t.slice(-5)      // "HH:mm" bar open time
-      const evalTime  = addFiveMinutes(barTime)     // "HH:mm" evaluation time (bar closed)
+      const evalTime  = barCandle.t.slice(-5)   // "HH:mm" — t is bar close time; evaluate at close
 
-      // Snapshot: candles closed by this bar, snapshots up to eval time
-      const closedCandles = allCandles.filter(c => c.t.slice(-5) <= barTime)
+      // Candles closed at or before this bar; snapshots up to this bar's close time
+      const closedCandles = allCandles.filter(c => c.t.slice(-5) <= evalTime)
       const addReadings   = allSnapshots.filter(s => s.time <= evalTime && s.add  != null).map(s => s.add!)
+      const tickReadings  = allSnapshots.filter(s => s.time <= evalTime && s.tick != null).map(s => s.tick!)
       const vixReadings   = allSnapshots.filter(s => s.time <= evalTime && s.vix  != null).map(s => s.vix!)
       const currentVix    = vixReadings.at(-1) ?? 0
       const currentSpx    = barCandle.c
@@ -188,12 +173,14 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
         const ctx: EvalContext = {
           todayCandles:   closedCandles,
           addReadings,
+          tickReadings,
           vixReadings,
-          openTrades:     [],          // K4 managed by this loop; never pass real trades
+          openTrades:     [],          // positions managed by this loop
+          tradesToday:    trades.length, // completed trades so far this session
           marketSummary,
           vixDailyCloses,
           prevSpxClose,
-          currentTimeET:  evalTime,   // bar's time → correct K5 and spread-credit hours
+          currentTimeET:  evalTime,
         }
 
         const evalResult = service.evaluate(ctx, config)
@@ -236,7 +223,7 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
     // Force-close any remaining position at end of scan window
     if (activePosition && scanCandles.length > 0) {
       const last     = scanCandles.at(-1)!
-      const evalTime = addFiveMinutes(last.t.slice(-5))
+      const evalTime = last.t.slice(-5)
       const lastVix  = allSnapshots.filter(s => s.vix  != null).at(-1)?.vix  ?? 0
       const hoursLeft = remainingHoursFromBarTime(evalTime)
       const exitPrice = computeCurrentSpreadPrice(

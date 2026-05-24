@@ -4,12 +4,14 @@ import type { TradeWithExits } from '../db/tradeRepository.js'
 export interface EvalContext {
   todayCandles:    SpxCandle[]
   addReadings:     number[]
+  tickReadings?:   number[]   // NYSE TICK values; optional — scored 0 when absent
   vixReadings:     number[]
   openTrades:      TradeWithExits[]
+  tradesToday?:    number      // total trades entered today (open + closed); drives threshold and daily limit
   marketSummary:   unknown
   vixDailyCloses:  number[]
   prevSpxClose:    number | null
-  currentTimeET?:  string   // "HH:MM" — overrides wall clock for K5 and spread pricing (used by backtest)
+  currentTimeET?:  string   // "HH:MM" — overrides wall clock for spread pricing (used by backtest)
 }
 
 export interface EvaluationResult {

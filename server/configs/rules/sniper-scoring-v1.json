@@ -1,0 +1,24 @@
+{
+  "scanWindowStart": "10:15",
+  "scanWindowEnd": "15:30",
+  "entryWindowEnd": "14:30",
+  "params": {
+    "vixMin": 12,
+    "vixKillThreshold": 35,
+    "entryScoreThreshold": 16,
+    "secondTradeScoreThreshold": 19,
+    "roundLevelPt": 50,
+    "roundLevelWindow": 10,
+    "rsiBullThreshold": 35,
+    "rsiBearThreshold": 65,
+    "ivrMinPct": 25,
+    "timeMinHours": 2.0,
+    "tickBullExtreme": -1000,
+    "tickBearExtreme": 1000,
+    "riskFreeRate": 0.04,
+    "sl1Multiplier": 2.5,
+    "tp1Multiplier": 0.20,
+    "tp2Multiplier": 0.30,
+    "tp2TimeET": "13:45"
+  }
+}

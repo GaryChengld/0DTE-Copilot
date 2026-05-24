@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { listRules, evaluateRule } from '../rules/engine.js'
 import { fetchSpxCandles, fetchVixDailyCloses, fetchSpxPrevDayClose } from '../services/marketData.js'
-import { findOpenTrades } from '../db/tradeRepository.js'
+import { findOpenTrades, findTodayClosedTrades } from '../db/tradeRepository.js'
 import { getLatestMarketSummary } from '../db/marketSummaryRepository.js'
 import { getTodayOtherIndexSnapshots } from '../db/otherIndexesRepository.js'
 import type { EvalContext } from '../rules/types.js'
@@ -24,10 +24,11 @@ router.post('/rules/:id/evaluate', async (req: Request, res: Response) => {
   const id = String(req.params.id)
   try {
     const tradeDate = tradeDateET()
-    const [spxCandles, openTrades, marketSummary, snapshots, vixDailyCloses, prevSpxClose] =
+    const [spxCandles, openTrades, closedToday, marketSummary, snapshots, vixDailyCloses, prevSpxClose] =
       await Promise.all([
         fetchSpxCandles(),
         findOpenTrades(),
+        findTodayClosedTrades(tradeDate),
         getLatestMarketSummary(),
         getTodayOtherIndexSnapshots(tradeDate),
         fetchVixDailyCloses(22),
@@ -38,9 +39,11 @@ router.post('/rules/:id/evaluate', async (req: Request, res: Response) => {
 
     const ctx: EvalContext = {
       todayCandles,
-      addReadings:    snapshots.filter(s => s.add != null).map(s => s.add!),
-      vixReadings:    snapshots.filter(s => s.vix != null).map(s => s.vix!),
+      addReadings:    snapshots.filter(s => s.add  != null).map(s => s.add!),
+      tickReadings:   snapshots.filter(s => s.tick != null).map(s => s.tick!),
+      vixReadings:    snapshots.filter(s => s.vix  != null).map(s => s.vix!),
       openTrades,
+      tradesToday:    openTrades.length + closedToday.length,
       marketSummary,
       vixDailyCloses,
       prevSpxClose,

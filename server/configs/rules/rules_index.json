@@ -7,5 +7,14 @@
     "configFile": "three-voter-v1.json",
     "service": "threeVoterV1",
     "enabled": true
+  },
+  {
+    "id": "sniper-scoring-v1",
+    "name": "Sniper Scoring System",
+    "version": "1.0",
+    "description": "22-point weighted scoring: Structure, Momentum, Volatility, Breadth — entry at ≥14/22",
+    "configFile": "sniper-scoring-v1.json",
+    "service": "sniperScoringV1",
+    "enabled": true
   }
 ]

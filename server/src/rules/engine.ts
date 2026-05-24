@@ -19,7 +19,8 @@ interface IndexEntry {
 // Service registry: service name → lazy loader.
 // Add new rules here alongside their entry in rules_index.json.
 const SERVICE_REGISTRY: Record<string, () => Promise<RuleService>> = {
-  threeVoterV1: () => import('./services/threeVoterV1.js').then(m => m.threeVoterV1Service),
+  threeVoterV1:     () => import('./services/threeVoterV1.js').then(m => m.threeVoterV1Service),
+  sniperScoringV1:  () => import('./services/sniperScoringV1.js').then(m => m.sniperScoringV1Service),
 }
 
 function loadIndex(): IndexEntry[] {
