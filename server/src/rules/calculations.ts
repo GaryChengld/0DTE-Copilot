@@ -135,6 +135,13 @@ export function currentEtDate(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 }
 
+// Advance an "HH:MM" string by 5 minutes — converts bar open time to bar close time.
+export function addFiveMinutes(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  const total  = h * 60 + m + 5
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
 // Hours from a "HH:MM" bar time string until 16:00 ET (clamped to 0).
 export function remainingHoursFromBarTime(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number)
