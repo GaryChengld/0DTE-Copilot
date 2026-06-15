@@ -37,20 +37,23 @@ export interface RuleInfo {
   description: string
 }
 
+export interface BacktestBarTrade {
+  shortStrike:  number
+  longStrike:   number
+  entryCredit:  number
+  exitTime?:    string
+  exitPrice?:   number
+  exitReason?:  'TP1' | 'TP2' | 'SL1' | 'SL2' | 'FORCED'
+  pnl?:         number
+}
+
 export interface BacktestBarRow {
-  time:          string
-  summary:       string   // rule-generated one-liner; rule-agnostic display
-  markdown?:     string   // full evaluation markdown (only for bars where evaluate() was called)
-  decision:      'GO' | 'NO-GO' | 'WAIT' | 'HALT'
-  direction?:    'bear_call' | 'bull_put'
-  hasPosition:   boolean
-  isEntry?:      boolean
-  isExit?:       boolean
-  exitReason?:   'TP1' | 'TP2' | 'SL1' | 'SL2' | 'FORCED'
-  shortStrike?:  number
-  longStrike?:   number
-  entryCredit?:  number
-  currentPrice?: number
+  time:       string
+  summary:    string    // rule-generated one-liner; rule-agnostic display
+  markdown?:  string    // full evaluation markdown (only for bars where evaluate() was called)
+  decision:   'GO' | 'NO-GO' | 'WAIT' | 'HALT'
+  direction?: 'bear_call' | 'bull_put'
+  trade?:     BacktestBarTrade   // present only when decision === 'GO' and trade was entered
 }
 
 export interface BacktestTrade {

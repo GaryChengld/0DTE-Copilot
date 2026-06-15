@@ -28,13 +28,13 @@ const EXIT_COLOR: Record<string, string> = {
 // ── Notes helper ─────────────────────────────────────────────────────────────
 
 function noteText(bar: BacktestBarRow): string {
-  if (bar.isEntry && bar.shortStrike != null)
-    return `${bar.direction === "bear_call" ? "Bear Call" : "Bull Put"} ${bar.shortStrike}/${bar.longStrike} @ $${bar.entryCredit?.toFixed(2)}`
-  if (bar.isExit && bar.currentPrice != null)
-    return `$${bar.currentPrice.toFixed(2)}`
-  if (bar.hasPosition && bar.currentPrice != null)
-    return `Holding · $${bar.currentPrice.toFixed(2)}`
-  return ""
+  const t = bar.trade
+  if (!t) return ""
+  const dir   = bar.direction === "bear_call" ? "Bear Call" : "Bull Put"
+  const entry = `${dir} ${t.shortStrike}/${t.longStrike} @ $${t.entryCredit.toFixed(2)}`
+  if (!t.exitReason) return entry
+  const pnlStr = t.pnl != null ? ` (${t.pnl >= 0 ? "+" : ""}${t.pnl.toFixed(2)})` : ""
+  return `${entry} → ${t.exitReason} $${t.exitPrice?.toFixed(2)}${pnlStr}`
 }
 
 // ── Left: Bar grid ────────────────────────────────────────────────────────────
@@ -63,12 +63,9 @@ function BarTable({
             const isSelected = selectedIdx === i
             const rowBg = isSelected
               ? "#1e3a5f"
-              : bar.isEntry ? "#0d2b1a"
-              : bar.isExit  ? "#2b0d0d"
+              : bar.decision === "GO" && bar.trade ? "#0d2b1a"
               : undefined
-            const decColor = bar.isExit
-              ? (EXIT_COLOR[bar.exitReason ?? ""] ?? "white")
-              : DECISION_COLOR[bar.decision] ?? "var(--text-muted)"
+            const decColor = DECISION_COLOR[bar.decision] ?? "var(--text-muted)"
 
             return (
               <tr
@@ -100,31 +97,23 @@ function BarTable({
 
 // ── Right: Bar detail panel ───────────────────────────────────────────────────
 
-function PositionInfo({ bar }: { bar: BacktestBarRow }) {
-  if (!bar.isEntry && !bar.isExit && !bar.hasPosition) return null
-  const dirLabel = bar.direction === "bear_call" ? "Bear Call" : "Bull Put"
+function TradeInfo({ bar }: { bar: BacktestBarRow }) {
+  const t = bar.trade
+  if (!t) return null
+  const dir = bar.direction === "bear_call" ? "Bear Call" : "Bull Put"
   return (
     <div className="rounded p-2 text-xs mb-3" style={{ background: "#1c2333" }}>
-      {bar.isEntry && bar.shortStrike != null && (
-        <>
-          <div style={{ color: "#4ade80" }}>Entry — {dirLabel} {bar.shortStrike}/{bar.longStrike}</div>
-          <div style={{ color: "var(--text-muted)" }}>Credit: ${bar.entryCredit?.toFixed(2)}</div>
-        </>
-      )}
-      {bar.isExit && (
-        <>
-          <div style={{ color: EXIT_COLOR[bar.exitReason ?? ""] ?? "white" }}>Exit — {bar.exitReason}</div>
-          {bar.shortStrike != null && (
-            <div style={{ color: "var(--text-muted)" }}>
-              {dirLabel} {bar.shortStrike}/{bar.longStrike} · Entry ${bar.entryCredit?.toFixed(2)} → Exit ${bar.currentPrice?.toFixed(2)}
-            </div>
-          )}
-        </>
-      )}
-      {bar.hasPosition && !bar.isEntry && !bar.isExit && bar.currentPrice != null && (
-        <div style={{ color: "var(--text-muted)" }}>
-          Holding {dirLabel} {bar.shortStrike}/{bar.longStrike} · Current ${bar.currentPrice.toFixed(2)}
+      <div style={{ color: "#4ade80" }}>
+        {dir} {t.shortStrike}/{t.longStrike} @ ${t.entryCredit.toFixed(2)}
+      </div>
+      {t.exitReason ? (
+        <div style={{ color: EXIT_COLOR[t.exitReason] ?? "white" }}>
+          Exit {t.exitReason} @ ${t.exitPrice?.toFixed(2)}
+          {t.pnl != null && ` · PnL: ${t.pnl >= 0 ? "+" : ""}${t.pnl.toFixed(2)}`}
+          {t.exitTime && ` · at ${t.exitTime}`}
         </div>
+      ) : (
+        <div style={{ color: "var(--text-muted)" }}>No exit found within scan window</div>
       )}
     </div>
   )
@@ -141,7 +130,7 @@ function BarDetail({ bar }: { bar: BacktestBarRow | null }) {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto rounded p-4" style={{ background: "#0d1117", border: "1px solid var(--border)" }}>
-      <PositionInfo bar={bar} />
+      <TradeInfo bar={bar} />
       {bar.markdown ? (
         <div className="prose prose-invert max-w-none text-sm">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{bar.markdown}</ReactMarkdown>
