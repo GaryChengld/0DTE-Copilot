@@ -28,6 +28,12 @@ interface ReplayData {
   market_summary?: unknown
 }
 
+function addFiveMinutes(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  const total  = h * 60 + m + 5
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
 function toSpxCandle(c: ReplayCandle, date: string): SpxCandle {
   return {
     t: `${date}T${c.t}`,
@@ -72,10 +78,10 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
     const scanStart  = cfg.scanWindowStart ?? '10:15'
     const scanEnd    = cfg.scanWindowEnd   ?? '15:00'
 
-    // t is bar close time; scan window is [scanStart, scanEnd] inclusive
+    // t is bar open time; filter by close time (open + 5 min) so the window boundaries are close times
     const scanCandles = allCandles.filter(c => {
-      const t = c.t.slice(-5)
-      return t >= scanStart && t <= scanEnd
+      const closeTime = addFiveMinutes(c.t.slice(-5))
+      return closeTime >= scanStart && closeTime <= scanEnd
     })
 
     interface ActivePos {
@@ -94,10 +100,11 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
 
     for (let i = 0; i < scanCandles.length; i++) {
       const barCandle = scanCandles[i]
-      const evalTime  = barCandle.t.slice(-5)   // "HH:mm" — t is bar close time; evaluate at close
+      const barTime   = barCandle.t.slice(-5)      // "HH:mm" bar open time
+      const evalTime  = addFiveMinutes(barTime)     // "HH:mm" evaluation time (bar close)
 
-      // Candles closed at or before this bar; snapshots up to this bar's close time
-      const closedCandles = allCandles.filter(c => c.t.slice(-5) <= evalTime)
+      // Candles with open time ≤ barTime = all bars closed by evalTime; snapshots up to evalTime
+      const closedCandles = allCandles.filter(c => c.t.slice(-5) <= barTime)
       const addReadings   = allSnapshots.filter(s => s.time <= evalTime && s.add  != null).map(s => s.add!)
       const tickReadings  = allSnapshots.filter(s => s.time <= evalTime && s.tick != null).map(s => s.tick!)
       const vixReadings   = allSnapshots.filter(s => s.time <= evalTime && s.vix  != null).map(s => s.vix!)
@@ -115,18 +122,21 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
         // SL2: ADD has reversed to trend-level opposing since entry.
         // Requires ADD data existed at entry (no baseline = no reversal possible) and
         // ADD was not already opposing at entry (conflict-mode entries are excluded).
-        const last3Add  = addReadings.slice(-3)
-        const sl2Thr    = params.addTrendThreshold ?? 500
-        const entryWasOpposing = pos.entryAddPresent && (
-          pos.direction === 'bear_call' ? pos.entryAdd > sl2Thr : pos.entryAdd < -sl2Thr
+        const last3Add    = addReadings.slice(-3)
+        const sl2ThrRaw   = params.addTrendThreshold  // undefined for rules that don't define it (e.g. sniper)
+        const entryWasOpposing = sl2ThrRaw !== undefined && pos.entryAddPresent && (
+          pos.direction === 'bear_call' ? pos.entryAdd > sl2ThrRaw : pos.entryAdd < -sl2ThrRaw
         )
-        const sl2 = pos.entryAddPresent && !entryWasOpposing && last3Add.length >= 3 &&
-          last3Add.every(a => pos.direction === 'bull_put' ? a < -sl2Thr : a > sl2Thr)
+        const sl2 = sl2ThrRaw !== undefined &&
+          pos.entryAddPresent && !entryWasOpposing && last3Add.length >= 3 &&
+          last3Add.every(a => pos.direction === 'bull_put' ? a < -sl2ThrRaw : a > sl2ThrRaw)
+
+        const tp2Time = (params as unknown as Record<string, string>).tp2TimeET ?? '13:45'
 
         let exitReason: BacktestBarRow['exitReason'] | null = null
         if      (currentPrice >= pos.entryCredit * (params.sl1Multiplier ?? 2.0))   exitReason = 'SL1'
         else if (currentPrice <= pos.entryCredit * (params.tp1Multiplier ?? 0.3))   exitReason = 'TP1'
-        else if (evalTime >= '13:45' && currentPrice <= pos.entryCredit * (params.tp2Multiplier ?? 0.5)) exitReason = 'TP2'
+        else if (evalTime >= tp2Time && currentPrice <= pos.entryCredit * (params.tp2Multiplier ?? 0.5)) exitReason = 'TP2'
         else if (sl2)              exitReason = 'SL2'
         else if (evalTime >= scanEnd) exitReason = 'FORCED'
 
@@ -221,10 +231,11 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
     }
 
     // Force-close any remaining position at end of scan window
+    // (fires only when a GO fires on the last scanCandle and the loop ends with activePosition set)
     if (activePosition && scanCandles.length > 0) {
-      const last     = scanCandles.at(-1)!
-      const evalTime = last.t.slice(-5)
-      const lastVix  = allSnapshots.filter(s => s.vix  != null).at(-1)?.vix  ?? 0
+      const last      = scanCandles.at(-1)!
+      const evalTime  = addFiveMinutes(last.t.slice(-5))
+      const lastVix   = allSnapshots.filter(s => s.vix != null && s.time <= evalTime).at(-1)?.vix ?? 0
       const hoursLeft = remainingHoursFromBarTime(evalTime)
       const exitPrice = computeCurrentSpreadPrice(
         last.c, activePosition.direction,
@@ -242,6 +253,18 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
         exitPrice,
         exitReason:  'FORCED',
         pnl,
+      })
+      bars.push({
+        time:         evalTime,
+        summary:      'EXIT (FORCED)',
+        decision:     'HALT',
+        hasPosition:  true,
+        isExit:       true,
+        exitReason:   'FORCED',
+        shortStrike:  activePosition.shortStrike,
+        longStrike:   activePosition.longStrike,
+        entryCredit:  activePosition.entryCredit,
+        currentPrice: exitPrice,
       })
     }
 
