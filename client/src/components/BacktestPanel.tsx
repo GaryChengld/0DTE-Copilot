@@ -200,8 +200,8 @@ function TradeSummary({ trades }: { trades: BacktestTrade[] }) {
         </tbody>
       </table>
       <div className="flex justify-end gap-4 text-sm font-semibold mt-2">
-        <span style={{ color: "#4ade80" }}>W: {wins}</span>
-        <span style={{ color: "#f87171" }}>L: {losses}</span>
+        <span style={{ color: "#4ade80" }}>Win: {wins}</span>
+        <span style={{ color: "#f87171" }}>Lost: {losses}</span>
       </div>
     </div>
   )
