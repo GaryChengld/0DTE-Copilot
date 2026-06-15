@@ -65,7 +65,11 @@ function BarTable({
               ? "#1e3a5f"
               : bar.decision === "GO" && bar.trade ? "#0d2b1a"
               : undefined
-            const decColor = DECISION_COLOR[bar.decision] ?? "var(--text-muted)"
+            const decColor = bar.decision === "NO-GO"
+              ? "white"
+              : bar.decision === "GO" && bar.trade
+              ? ((bar.trade.pnl ?? 0) >= 0 ? "#4ade80" : "#f87171")
+              : DECISION_COLOR[bar.decision] ?? "var(--text-muted)"
 
             return (
               <tr
