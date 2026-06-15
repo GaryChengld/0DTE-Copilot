@@ -146,7 +146,7 @@ function BarDetail({ bar }: { bar: BacktestBarRow | null }) {
 
 // ── Trade summary ─────────────────────────────────────────────────────────────
 
-function TradeSummary({ trades, totalPnl }: { trades: BacktestTrade[]; totalPnl: number }) {
+function TradeSummary({ trades }: { trades: BacktestTrade[] }) {
   if (trades.length === 0) {
     return (
       <p className="text-xs mt-4" style={{ color: "var(--text-muted)" }}>
@@ -154,6 +154,8 @@ function TradeSummary({ trades, totalPnl }: { trades: BacktestTrade[]; totalPnl:
       </p>
     )
   }
+  const wins   = trades.filter(t => (t.pnl ?? 0) >= 0).length
+  const losses = trades.filter(t => (t.pnl ?? 0) <  0).length
   return (
     <div className="mt-5">
       <p className="text-xs font-medium mb-1" style={{ color: "var(--text-muted)" }}>
@@ -197,12 +199,10 @@ function TradeSummary({ trades, totalPnl }: { trades: BacktestTrade[]; totalPnl:
           })}
         </tbody>
       </table>
-      <p
-        className="text-sm font-semibold text-right mt-2"
-        style={{ color: totalPnl >= 0 ? "#4ade80" : "#f87171" }}
-      >
-        Total PnL: {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)}
-      </p>
+      <div className="flex justify-end gap-4 text-sm font-semibold mt-2">
+        <span style={{ color: "#4ade80" }}>W: {wins}</span>
+        <span style={{ color: "#f87171" }}>L: {losses}</span>
+      </div>
     </div>
   )
 }
@@ -303,7 +303,7 @@ export default function BacktestPanel({ date, active }: { date: string; active: 
               selectedIdx={selectedIdx}
               onSelect={setSelectedIdx}
             />
-            <TradeSummary trades={result.trades} totalPnl={result.totalPnl} />
+            <TradeSummary trades={result.trades} />
           </div>
 
           {/* Right: detail panel */}
