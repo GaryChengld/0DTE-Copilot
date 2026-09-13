@@ -39,11 +39,11 @@ export function computeVixChange(current: number, prevClose: number): number {
   return current - prevClose
 }
 
-// VIX 20-day MA from daily closes array (oldest→newest). Spec Section 6.
-export function computeVix20MA(closes: number[]): number | null {
-  if (closes.length < 20) return null
-  const last20 = closes.slice(-20)
-  return last20.reduce((a, b) => a + b, 0) / 20
+// VIX N-day MA (default 20) from daily closes array (oldest→newest). Spec Section 6.
+export function computeVix20MA(closes: number[], period = 20): number | null {
+  if (closes.length < period) return null
+  const lastN = closes.slice(-period)
+  return lastN.reduce((a, b) => a + b, 0) / period
 }
 
 // Short strike selection — OTM distance depends on VIX. Spec Section 7.
@@ -51,8 +51,9 @@ function otmDistancePt(vix: number): number {
   return vix < 15 ? 25 : vix < 20 ? 35 : 45
 }
 
-export function computeShortStrike(spx: number, direction: Direction, vix: number): number {
-  const d = otmDistancePt(vix)
+// minDistancePt pushes the strike further OTM when a rule requires a larger buffer than the VIX table gives.
+export function computeShortStrike(spx: number, direction: Direction, vix: number, minDistancePt = 0): number {
+  const d = Math.max(otmDistancePt(vix), minDistancePt)
   return direction === 'bear_call'
     ? Math.ceil((spx + d) / 5) * 5
     : Math.floor((spx - d) / 5) * 5
@@ -89,9 +90,9 @@ export function computeSpreadCredit(
   direction: Direction,
   vix: number,
   remainingHours: number,
-  _r = 0.04,
+  minDistancePt = 0,
 ): { shortStrike: number; longStrike: number; credit: number } {
-  const K      = computeShortStrike(spx, direction, vix)
+  const K      = computeShortStrike(spx, direction, vix, minDistancePt)
   const Kl     = direction === 'bear_call' ? K + 10 : K - 10
   const credit = spreadPrice(spx, direction, K, Kl, vix, remainingHours)
   return { shortStrike: K, longStrike: Kl, credit: Math.max(0, Math.round(credit * 100) / 100) }
@@ -185,7 +186,6 @@ export function computeCurrentSpreadPrice(
   longStrike: number,
   vix: number,
   remainingHours: number,
-  _r = 0.04,
 ): number {
   return Math.max(0, Math.round(spreadPrice(spx, direction, shortStrike, longStrike, vix, remainingHours) * 100) / 100)
 }

@@ -39,34 +39,37 @@ export async function findTodayClosedTrades(tradeDate: string): Promise<TradeWit
   });
 }
 
-export async function createTradeExit(data: {
-  tradeId: number;
-  tradeDate: string;
-  exitQuantity: number;
-  exitPrice: number;
-  exitTime: string;
-  exitReason: string;
-  pnl: number | null;
-}): Promise<TradeExit> {
-  return prisma.tradeExit.create({ data });
-}
-
-export async function updateTradeAfterExit(
-  id: number,
+/** Record an exit and update the trade's remaining quantity/status atomically. */
+export async function recordTradeExit(
+  data: {
+    tradeId: number;
+    tradeDate: string;
+    exitQuantity: number;
+    exitPrice: number;
+    exitTime: string;
+    exitReason: string;
+    pnl: number | null;
+  },
   quantityRemaining: number
-): Promise<void> {
-  await prisma.trade.update({
-    where: { id },
-    data: {
-      quantityRemaining,
-      status: quantityRemaining > 0 ? "PARTIAL_CLOSED" : "CLOSED",
-    },
-  });
+): Promise<TradeExit> {
+  const [exit] = await prisma.$transaction([
+    prisma.tradeExit.create({ data }),
+    prisma.trade.update({
+      where: { id: data.tradeId },
+      data: {
+        quantityRemaining,
+        status: quantityRemaining > 0 ? "PARTIAL_CLOSED" : "CLOSED",
+      },
+    }),
+  ]);
+  return exit;
 }
 
 export async function deleteTrade(id: number): Promise<number> {
-  const { count } = await prisma.tradeExit.deleteMany({ where: { tradeId: id } });
-  await prisma.trade.delete({ where: { id } });
+  const [{ count }] = await prisma.$transaction([
+    prisma.tradeExit.deleteMany({ where: { tradeId: id } }),
+    prisma.trade.delete({ where: { id } }),
+  ]);
   return count;
 }
 

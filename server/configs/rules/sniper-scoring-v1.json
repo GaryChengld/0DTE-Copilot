@@ -15,7 +15,6 @@
     "timeMinHours": 2.0,
     "tickBullExtreme": -1000,
     "tickBearExtreme": 1000,
-    "riskFreeRate": 0.04,
     "sl1Multiplier": 2.5,
     "tp1Multiplier": 0.20,
     "tp2Multiplier": 0.30,

@@ -3,8 +3,7 @@ import {
   createTrade,
   findTradeById,
   findOpenTrades,
-  createTradeExit,
-  updateTradeAfterExit,
+  recordTradeExit,
   deleteTrade,
   getMonthlyPnl,
   findTradesByDate,
@@ -149,17 +148,18 @@ router.post("/trades/exits", async (req: Request, res: Response) => {
       : (exitPrice - trade.entryPrice) * exitQuantity * 100
     : null;
 
-  const exit = await createTradeExit({
-    tradeId,
-    tradeDate: trade.tradeDate,
-    exitQuantity,
-    exitPrice,
-    exitTime: exitTime ?? nowET(),
-    exitReason,
-    pnl,
-  });
-
-  await updateTradeAfterExit(tradeId, trade.quantityRemaining - exitQuantity);
+  const exit = await recordTradeExit(
+    {
+      tradeId,
+      tradeDate: trade.tradeDate,
+      exitQuantity,
+      exitPrice,
+      exitTime: exitTime ?? nowET(),
+      exitReason,
+      pnl,
+    },
+    trade.quantityRemaining - exitQuantity
+  );
 
   res.status(201).json({
     id: exit.id,

@@ -311,6 +311,23 @@ async function fetchDailyCandlesUpTo(symbol: string, days: number, upToDate: Dat
     .map((q) => ({ high: q.high!, low: q.low!, close: q.close! }));
 }
 
+// Daily closes for ET trading days strictly before `beforeDate` ("YYYY-MM-DD"), oldest→newest.
+async function fetchDailyClosesBefore(symbol: string, days: number, beforeDate: string): Promise<number[]> {
+  const before  = new Date(`${beforeDate}T12:00:00Z`);
+  const period1 = new Date(before.getTime() - days * 24 * 60 * 60 * 1000);
+
+  const result = (await yahooFinance.chart(symbol, {
+    period1,
+    period2: before,
+    interval: "1d" as const,
+  })) as unknown as YFChartResult;
+
+  return (result.quotes ?? [])
+    .filter((q) => q.date != null && q.close != null &&
+      new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(q.date) < beforeDate)
+    .map((q) => q.close!);
+}
+
 export async function fetchSpxReplayData(date: string): Promise<{ candles_5m: Candle5m[]; daily_stats: DailyStats }> {
   const targetDate = new Date(`${date}T12:00:00Z`);
   const period1 = new Date(targetDate.getTime() - 24 * 60 * 60 * 1000);
@@ -517,10 +534,7 @@ export async function fetchSpxCandlesByDate(date: string): Promise<SpxCandle[]> 
   const period1 = new Date(targetDate.getTime() - 7 * 24 * 60 * 60 * 1000);
   const period2 = new Date(targetDate.getTime() + 2 * 24 * 60 * 60 * 1000);
 
-  const [spxResult, seedCloses] = await Promise.all([
-    yahooFinance.chart("^GSPC", { period1, period2, interval: "5m" as const }) as unknown as Promise<YFChartResult>,
-    fetchDailyCloses("^GSPC", 60),
-  ]);
+  const spxResult = (await yahooFinance.chart("^GSPC", { period1, period2, interval: "5m" as const })) as unknown as YFChartResult;
 
   const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -551,7 +565,9 @@ export async function fetchSpxCandlesByDate(date: string): Promise<SpxCandle[]> 
   }
   const combined = allCandles.slice(-80);
 
-  // Seed RSI with daily closes then append intraday closes
+  // Seed RSI with the daily closes that precede the first displayed candle's day, then append intraday closes
+  const firstDateET = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(combined[0].date);
+  const seedCloses  = await fetchDailyClosesBefore("^GSPC", 60, firstDateET);
   const intradayCloses = combined.map((c) => c.close);
   const rsiAll = RSI.calculate({ period: 14, values: [...seedCloses, ...intradayCloses] });
   const rsiIntraday = rsiAll.slice(rsiAll.length - intradayCloses.length);
@@ -676,6 +692,35 @@ export async function fetchSpxDailySnapshot(): Promise<SpxDailySnapshot> {
   };
 }
 
+// Aggregate 5m candles into 15m candles by 15-min clock slot (not by position), so a missing
+// 5m candle shrinks one bucket instead of shifting every later one. Skips the still-forming
+// slot and the post-close 16:00 print.
+const FIFTEEN_MIN = 15 * 60 * 1000;
+
+export function buildCandles15m(candles: RTHCandle[], now: number = Date.now()): Candle5m[] {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const buckets = new Map<number, RTHCandle[]>();
+  for (const c of candles) {
+    const slot = Math.floor(c.date.getTime() / FIFTEEN_MIN) * FIFTEEN_MIN; // ET offsets are whole hours
+    if (!buckets.has(slot)) buckets.set(slot, []);
+    buckets.get(slot)!.push(c);
+  }
+
+  const result: Candle5m[] = [];
+  for (const [slot, group] of [...buckets.entries()].sort(([a], [b]) => a - b)) {
+    if (slot + FIFTEEN_MIN > now || snap15mET(group[0].date) >= "16:00") continue;
+    result.push({
+      t: snap15mET(group[0].date),
+      o: r2(group[0].open),
+      h: r2(Math.max(...group.map((c) => c.high))),
+      l: r2(Math.min(...group.map((c) => c.low))),
+      c: r2(group[group.length - 1].close),
+      v: group.reduce((sum, c) => sum + c.volume, 0),
+    });
+  }
+  return result;
+}
+
 // --- Main export ---
 
 export async function fetchMarketData(): Promise<MarketData> {
@@ -696,24 +741,6 @@ export async function fetchMarketData(): Promise<MarketData> {
     c: r2(candle.close),
     v: candle.volume,
   });
-
-  const buildCandles15m = (candles: RTHCandle[]): Candle5m[] => {
-    const result: Candle5m[] = [];
-    for (let i = 0; i < candles.length; i += 3) {
-      const group = candles.slice(i, i + 3);
-      // Only include complete groups of 3 where the last candle is closed
-      if (group.length < 3 || !isCandleClosed(group[2].date)) break;
-      result.push({
-        t: snap15mET(group[0].date),
-        o: r2(group[0].open),
-        h: r2(Math.max(...group.map((c) => c.high))),
-        l: r2(Math.min(...group.map((c) => c.low))),
-        c: r2(group[group.length - 1].close),
-        v: group.reduce((sum, c) => sum + c.volume, 0),
-      });
-    }
-    return result;
-  };
 
   const buildDailyStats = (
     candles: RTHCandle[],
@@ -759,32 +786,18 @@ export async function fetchMarketData(): Promise<MarketData> {
   };
 }
 
-// Fetch the last `days` VIX daily closes — used for 20-day MA and previous close.
-export async function fetchVixDailyCloses(days: number): Promise<number[]> {
-  const period1 = new Date(Date.now() - Math.ceil(days * 1.6) * 24 * 60 * 60 * 1000);
-  const result = (await yahooFinance.chart("^VIX", {
-    period1,
-    interval: "1d" as const,
-  })) as unknown as YFChartResult;
-  const closes = (result.quotes ?? []).filter((q) => q.close != null).map((q) => q.close!);
+// Rule-context daily closes must end on the trading day BEFORE the evaluation date: Yahoo's latest
+// daily bar is the evaluation day itself (partial intraday, or the final close in a backtest),
+// which would make "previous close" comparisons (VIX change, K6 gap) look at the same day.
+
+// Last `days` VIX daily closes before `date` ("YYYY-MM-DD" ET) — VIX MA, IVR and previous close.
+export async function fetchVixDailyClosesBefore(days: number, date: string): Promise<number[]> {
+  const closes = await fetchDailyClosesBefore("^VIX", Math.ceil(days * 1.6), date);
   return closes.slice(-days);
 }
 
-// Fetch the most recent completed SPX daily close — used for opening gap calculation (K6).
-export async function fetchSpxPrevDayClose(): Promise<number | null> {
-  const closes = await fetchDailyCloses("^GSPC", 5);
-  return closes.length > 0 ? closes[closes.length - 1] : null;
-}
-
-// Fetch last `days` VIX daily closes up to a specific historical date (for backtest).
-export async function fetchVixDailyClosesUpTo(days: number, upToDate: Date): Promise<number[]> {
-  const closes = await fetchDailyClosesUpTo("^VIX", Math.ceil(days * 1.6), upToDate);
-  return closes.slice(-days);
-}
-
-// Fetch the SPX daily close for the trading day before `date` (for backtest K6 gap check).
-export async function fetchSpxPrevDayCloseFor(date: Date): Promise<number | null> {
-  const closes = await fetchDailyClosesUpTo("^GSPC", 5, date);
-  // closes includes the target date; second-to-last is the prior trading day
-  return closes.length >= 2 ? closes[closes.length - 2] : null;
+// SPX close of the trading day before `date` ("YYYY-MM-DD" ET) — opening gap check (K6).
+export async function fetchSpxPrevDayCloseBefore(date: string): Promise<number | null> {
+  const closes = await fetchDailyClosesBefore("^GSPC", 10, date); // 10 calendar days spans long weekends
+  return closes.at(-1) ?? null;
 }

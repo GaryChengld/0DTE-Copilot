@@ -18,7 +18,6 @@
     "distanceMinPt": 60,
     "ivCompressionFactor": 0.85,
     "vix20MAPeriod": 20,
-    "riskFreeRate": 0.04,
     "sl1Multiplier": 2.0,
     "tp1Multiplier": 0.3,
     "tp2Multiplier": 0.5

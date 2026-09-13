@@ -18,15 +18,16 @@ export class ClaudeProvider implements LLMProvider {
 
   async send(message: string): Promise<string> {
     if (!this.client) throw new Error("Claude not initialized");
-    this.messages.push({ role: "user", content: message });
+    // Commit to history only on success, so a failed call doesn't leave a dangling user turn
+    const messages: Message[] = [...this.messages, { role: "user", content: message }];
     const res = await this.client.messages.create({
       model: config.llm.claude.model,
       max_tokens: 4096,
       system: this.systemPrompt,
-      messages: this.messages,
+      messages,
     });
     const reply = res.content[0]?.type === "text" ? res.content[0].text : "";
-    this.messages.push({ role: "assistant", content: reply });
+    this.messages = [...messages, { role: "assistant", content: reply }];
     return reply;
   }
 

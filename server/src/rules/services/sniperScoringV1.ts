@@ -24,7 +24,6 @@ interface SniperScoringConfig {
     timeMinHours:              number
     tickBullExtreme:           number
     tickBearExtreme:           number
-    riskFreeRate:              number
     sl1Multiplier:             number
     tp1Multiplier:             number
     tp2Multiplier:             number
@@ -450,7 +449,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
   const direction: Direction = bullGo ? 'bull_put' : 'bear_call'
   const score = bullGo ? bullTotal : bearTotal
 
-  const { shortStrike, longStrike, credit } = computeSpreadCredit(spx, direction, vix, hrs, p.riskFreeRate)
+  const { shortStrike, longStrike, credit } = computeSpreadCredit(spx, direction, vix, hrs)
 
   lines.push(`# ✅ GO — ${direction === 'bear_call' ? 'Bear Call' : 'Bull Put'} (score ${score}/${maxTotal})`)
   lines.push('')

@@ -2,8 +2,8 @@ import { Router, Request, Response } from 'express'
 import { getRuleServiceAndConfig } from '../rules/engine.js'
 import { getReplayDataByDate } from '../db/replayDataRepository.js'
 import {
-  fetchVixDailyClosesUpTo,
-  fetchSpxPrevDayCloseFor,
+  fetchVixDailyClosesBefore,
+  fetchSpxPrevDayCloseBefore,
   type SpxCandle,
 } from '../services/marketData.js'
 import { runBacktest } from '../rules/backtest.js'
@@ -48,10 +48,10 @@ router.post('/backtest/:ruleId', async (req: Request, res: Response) => {
     }
     const replay = raw as ReplayData
 
-    const upToDate = new Date(`${date}T20:00:00Z`)
+    // Closes strictly before the backtest date — the day's own close isn't known during the session
     const [vixDailyCloses, prevSpxClose] = await Promise.all([
-      fetchVixDailyClosesUpTo(22, upToDate),
-      fetchSpxPrevDayCloseFor(upToDate),
+      fetchVixDailyClosesBefore(60, date),   // enough history for a configurable VIX MA period
+      fetchSpxPrevDayCloseBefore(date),
     ])
 
     const { service, config } = await getRuleServiceAndConfig(ruleId)

@@ -19,13 +19,14 @@ export class OpenAIProvider implements LLMProvider {
 
   async send(message: string): Promise<string> {
     if (!this.client) throw new Error("OpenAI not initialized");
-    this.messages.push({ role: "user", content: message });
+    // Commit to history only on success, so a failed call doesn't leave a dangling user turn
+    const messages: Message[] = [...this.messages, { role: "user", content: message }];
     const res = await this.client.chat.completions.create({
       model: config.llm.openai.model,
-      messages: this.messages,
+      messages,
     });
     const reply = res.choices[0]?.message?.content ?? "";
-    this.messages.push({ role: "assistant", content: reply });
+    this.messages = [...messages, { role: "assistant", content: reply }];
     return reply;
   }
 

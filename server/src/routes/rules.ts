@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { listRules, evaluateRule } from '../rules/engine.js'
-import { fetchSpxCandles, fetchVixDailyCloses, fetchSpxPrevDayClose } from '../services/marketData.js'
+import { fetchSpxCandles, fetchVixDailyClosesBefore, fetchSpxPrevDayCloseBefore } from '../services/marketData.js'
 import { findOpenTrades, findTodayClosedTrades } from '../db/tradeRepository.js'
 import { getLatestMarketSummary } from '../db/marketSummaryRepository.js'
 import { getTodayOtherIndexSnapshots } from '../db/otherIndexesRepository.js'
@@ -31,8 +31,8 @@ router.post('/rules/:id/evaluate', async (req: Request, res: Response) => {
         findTodayClosedTrades(tradeDate),
         getLatestMarketSummary(),
         getTodayOtherIndexSnapshots(tradeDate),
-        fetchVixDailyCloses(22),
-        fetchSpxPrevDayClose(),
+        fetchVixDailyClosesBefore(60, tradeDate),   // prior days only; enough for a configurable VIX MA period
+        fetchSpxPrevDayCloseBefore(tradeDate),
       ])
 
     const todayCandles = spxCandles.filter(c => c.t.startsWith(tradeDate) && !c.open)

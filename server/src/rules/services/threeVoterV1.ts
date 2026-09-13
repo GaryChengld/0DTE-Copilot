@@ -4,7 +4,7 @@ import type { TradeWithExits } from '../../db/tradeRepository.js'
 interface VoterResult { pass: boolean; details: string[] }
 import {
   computeRsi5, computeCandleShadows, computeOpeningGap,
-  computeVixChange, computeVix20MA, computeSpreadCredit,
+  computeVixChange, computeVix20MA, computeSpreadCredit, computeShortStrike,
   extractGexData, currentEtTime, remainingHoursToClose, remainingHoursFromBarTime,
   type Direction,
 } from '../calculations.js'
@@ -29,7 +29,6 @@ interface ThreeVoterConfig {
     distanceMinPt:        number
     ivCompressionFactor:  number
     vix20MAPeriod:        number
-    riskFreeRate:         number
     sl1Multiplier:        number
     tp1Multiplier:        number
     tp2Multiplier:        number
@@ -136,8 +135,9 @@ function voterT(ctx: EvalContext, dir: Direction, p: ThreeVoterConfig['params'])
 
 // ── Voter O ───────────────────────────────────────────────────────────────────
 
+// K = short strike being evaluated — the strike that will be (or was) traded.
 function voterO(
-  spx: number, dir: Direction, mode: AddMode,
+  spx: number, K: number, dir: Direction, mode: AddMode,
   gex: ReturnType<typeof extractGexData>,
   vix: number, vixCloses: number[],
   p: ThreeVoterConfig['params']
@@ -147,10 +147,6 @@ function voterO(
   if (!gex) {
     return { pass: false, details: [bad('No GEX data in market_summary — need gex_data.gamma_flip/call_wall/put_wall/gamma_regime')] }
   }
-
-  const K = dir === 'bear_call'
-    ? Math.ceil((spx + 65) / 5) * 5
-    : Math.floor((spx - 65) / 5) * 5
 
   // O directional confirmation (oscillation + conflict modes only)
   if (mode !== 'trend-aligned') {
@@ -178,7 +174,7 @@ function voterO(
     `O2 ${dir === 'bear_call' ? 'Call' : 'Put'} wall: strike ${K} ${dir === 'bear_call' ? '≥' : '≤'} wall ${wall}`
   ))
 
-  const vix20ma = computeVix20MA(vixCloses)
+  const vix20ma = computeVix20MA(vixCloses, p.vix20MAPeriod)
   const ivFloor = vix20ma !== null ? vix20ma * p.ivCompressionFactor : null
   const o3a = ivFloor !== null && vix > ivFloor
   const o3b = Math.abs(K - spx) >= p.distanceMinPt
@@ -254,6 +250,14 @@ function voterB(
 
 // ── Position Management (K4 active) ──────────────────────────────────────────
 
+// Short leg of an open credit spread from its strike string ("5510/5500"):
+// the leg nearer the money — lower for a bear call, higher for a bull put.
+function openShortStrike(trade: TradeWithExits, dir: Direction): number | null {
+  const strikes = (trade.strike ?? '').split('/').map(Number).filter(n => Number.isFinite(n) && n > 0)
+  if (strikes.length === 0) return null
+  return dir === 'bear_call' ? Math.min(...strikes) : Math.max(...strikes)
+}
+
 function positionAdvisory(
   trade: TradeWithExits,
   ctx: EvalContext,
@@ -314,7 +318,8 @@ function positionAdvisory(
   } else {
     const vix = ctx.vixReadings.at(-1) ?? 0
     const spx = ctx.todayCandles.at(-1)?.c ?? 0
-    const o = voterO(spx, dir, 'trend-aligned', gex, vix, ctx.vixDailyCloses, p)
+    const K   = openShortStrike(trade, dir) ?? computeShortStrike(spx, dir, vix, p.distanceMinPt)
+    const o = voterO(spx, K, dir, 'trend-aligned', gex, vix, ctx.vixDailyCloses, p)
     if (!o.pass) {
       lines.push('> ⚠️ **Voter O has reversed — consider TP3 exit.**')
       o.details.forEach(d => lines.push(`> - ${d}`))
@@ -401,13 +406,16 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
   const vix    = ctx.vixReadings.at(-1) ?? 0
   const vixChg = computeVixChange(vix, ctx.vixDailyCloses.at(-1) ?? 0)
 
+  // One strike for both Voter O and the trade: Section 7 VIX distance, pushed out to O3b's minimum
+  const shortStrike = computeShortStrike(spx, direction, vix, p.distanceMinPt)
+
   // Layer 3: voters (mode-correct direction and bThr for GO decision)
   const tResult = voterT(ctx, direction, p)
   lines.push(`## Voter T — Technical ${tResult.pass ? '✅ PASS' : '❌ FAIL'}`)
   tResult.details.forEach(d => lines.push(`- ${d}`))
   lines.push('')
 
-  const oResult = voterO(spx, direction, mode, gex, vix, ctx.vixDailyCloses, p)
+  const oResult = voterO(spx, shortStrike, direction, mode, gex, vix, ctx.vixDailyCloses, p)
   lines.push(`## Voter O — Options Structure ${oResult.pass ? '✅ PASS' : '❌ FAIL'}`)
   oResult.details.forEach(d => lines.push(`- ${d}`))
   lines.push('')
@@ -434,7 +442,7 @@ function evaluate(ctx: EvalContext, config: unknown): EvaluationResult {
 
   if (votes >= 2 && o3Pass) {
     const hrs = ctx.currentTimeET ? remainingHoursFromBarTime(ctx.currentTimeET) : remainingHoursToClose()
-    const { shortStrike, longStrike, credit } = computeSpreadCredit(spx, direction, vix, hrs, p.riskFreeRate)
+    const { longStrike, credit } = computeSpreadCredit(spx, direction, vix, hrs, p.distanceMinPt)
     lines.push(`# ✅ GO — ${direction === 'bear_call' ? 'Bear Call' : 'Bull Put'}`)
     lines.push('')
     lines.push('## Trade Parameters')

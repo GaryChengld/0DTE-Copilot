@@ -1,4 +1,5 @@
 import prisma from "./client.js";
+import { etDayRange } from "../utils/marketHours.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createMarketSummary(data: any): Promise<void> {
@@ -13,15 +14,10 @@ export async function getLatestMarketSummary(): Promise<unknown> {
 }
 
 export async function getMarketSummaryByDate(date: string): Promise<unknown> {
-  // Span the full ET calendar day in both EDT (UTC-4) and EST (UTC-5):
-  // from = date 04:00 UTC (ET midnight in EDT)
-  // to   = date+1 05:00 UTC (ET midnight in EST on the next day)
-  const from = new Date(`${date}T04:00:00Z`);
-  const to   = new Date(`${date}T05:00:00Z`);
-  to.setUTCDate(to.getUTCDate() + 1);
+  const { start, end } = etDayRange(date);
 
   const record = await prisma.marketSummary.findFirst({
-    where: { timestamp: { gte: from, lt: to } },
+    where: { timestamp: { gte: start, lt: end } },
     orderBy: { timestamp: "desc" },
   });
   return record?.data ?? null;

@@ -173,7 +173,6 @@ Parameters for the Three-Voter rule. All numeric thresholds match the spec (`ser
     "distanceMinPt": 60,
     "ivCompressionFactor": 0.85,
     "vix20MAPeriod": 20,
-    "riskFreeRate": 0.04,
     "sl1Multiplier": 2.0,
     "tp1Multiplier": 0.3,
     "tp2Multiplier": 0.5
@@ -194,10 +193,9 @@ Parameters for the Three-Voter rule. All numeric thresholds match the spec (`ser
 | `vixChangeStopPt` | B3 | VIX daily change above this → B3 fails (+2pt) |
 | `openingGapKillPct` | K6 | Opening gap fraction above this → HALT (0.5%) |
 | `gammaFlipOffsetPt` | O1 | Short strike must be this many points beyond gamma flip (50pt) |
-| `distanceMinPt` | O3b | Minimum OTM distance from SPX to short strike (60pt) |
+| `distanceMinPt` | O3b, Section 7 | Minimum OTM distance from SPX to short strike (60pt); the traded strike is the Section 7 VIX strike pushed out to at least this distance, and Voter O evaluates that same strike |
 | `ivCompressionFactor` | O3a | VIX must exceed `VIX_20MA × factor`; below = IV too compressed (0.85) |
-| `vix20MAPeriod` | O3a | Period for VIX moving average (20 trading days) |
-| `riskFreeRate` | Section 8 | Black-Scholes risk-free rate for credit estimate (0.04) |
+| `vix20MAPeriod` | O3a | Period for VIX moving average (20 trading days; routes fetch 60 daily closes) |
 | `sl1Multiplier` | SL1 | Stop loss triggers when spread price ≥ entry credit × this value (2.0 = 100% loss on premium) |
 | `tp1Multiplier` | TP1 | Take profit triggers when spread price ≤ entry credit × this value (0.3 = 70% profit) |
 | `tp2Multiplier` | TP2 | Time-based take profit at 13:45 ET when spread ≤ entry credit × this value (0.5 = 50% profit) |
