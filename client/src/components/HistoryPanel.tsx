@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check, Copy, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Check, Copy, Download, Loader2, Pencil, Trash2 } from "lucide-react";
 import SpxCandleChart from "./SpxCandleChart";
 import BacktestPanel from "./BacktestPanel";
 import HistoryCalendar from "./HistoryCalendar";
@@ -15,7 +15,7 @@ import {
   type JournalEntry,
   type AiAdviceEntry,
 } from "../api/journal";
-import { getReplayPayload } from "../api/replay";
+import { getReplayPayload, exportAllReplays } from "../api/replay";
 import {
   getMonthlyPnl,
   getTradesByDate,
@@ -374,6 +374,47 @@ function ReplayView({ date, active }: { date: string; active: boolean }) {
   return null;
 }
 
+// ── Sub-component: ReplayExportButton ──────────────────────────────────────
+
+// Exports ALL cached replay days (not just the selected date) to the server's export folder.
+function ReplayExportButton() {
+  const [exporting, setExporting] = useState(false);
+  const [status, setStatus] = useState<{ text: string; error: boolean; title?: string } | null>(null);
+
+  async function handleExport() {
+    setExporting(true);
+    setStatus(null);
+    try {
+      const r = await exportAllReplays();
+      setStatus({ text: `Exported ${r.writtenCount} · skipped ${r.skippedCount}`, error: false, title: r.dir });
+    } catch (err) {
+      setStatus({ text: err instanceof Error ? err.message : "Export failed", error: true });
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <>
+      {status && (
+        <span className="text-xs" title={status.title} style={{ color: status.error ? "#f87171" : "var(--text-muted)" }}>
+          {status.text}
+        </span>
+      )}
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        title="Export all cached replay days to the server's export folder (existing files are skipped)"
+        className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors hover:text-white disabled:opacity-50"
+        style={{ background: "#1c2333", color: "var(--text-muted)" }}
+      >
+        {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+        {exporting ? "Exporting…" : "Export All"}
+      </button>
+    </>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 type RightTab = "advices" | "journal" | "replay" | "backtest";
@@ -556,12 +597,12 @@ export default function HistoryPanel({ visible }: { visible: boolean }) {
                 : "Backtest"}
             </button>
           ))}
-          <span
-            className="ml-auto self-center text-xs pb-1.5"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {selectedDate}
-          </span>
+          <div className="ml-auto self-center flex items-center gap-3 pb-1.5">
+            {rightTab === "replay" && <ReplayExportButton />}
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {selectedDate}
+            </span>
+          </div>
         </div>
 
         {/* Right content — each tab gets its own scroll container so positions are independent */}

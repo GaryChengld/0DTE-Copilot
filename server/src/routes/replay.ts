@@ -4,6 +4,8 @@ import { getTodayOtherIndexSnapshots } from '../db/otherIndexesRepository.js'
 import { findTradesByDate } from '../db/tradeRepository.js'
 import { getMarketSummaryByDate } from '../db/marketSummaryRepository.js'
 import { getReplayDataByDate, saveReplayData } from '../db/replayDataRepository.js'
+import { exportReplayData } from '../services/replayExport.js'
+import { config } from '../config.js'
 
 const router = Router()
 
@@ -80,6 +82,19 @@ router.get('/ai/replay/message', async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[replay] error:', message)
+    res.status(500).json({ error: message })
+  }
+})
+
+// Export all cached replay days to REPLAY_EXPORT_DIR, one YYYY-MM-DD.json each.
+// Never overwrites — files that already exist are skipped (use the CLI with --overwrite to replace).
+router.post('/replay/export', async (_req: Request, res: Response) => {
+  try {
+    const { dir, written, skipped } = await exportReplayData(config.replayExportDir, false)
+    res.json({ dir, writtenCount: written.length, skippedCount: skipped.length, written, skipped })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[replay/export] error:', message)
     res.status(500).json({ error: message })
   }
 })

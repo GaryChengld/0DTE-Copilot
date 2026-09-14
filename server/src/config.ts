@@ -6,6 +6,8 @@ export const config = {
   promptFile: process.env.PROMPT_FILE ?? "strategicPrompt.md",
   sessionSummaryInterval: parseInt(process.env.SESSION_SUMMARY_INTERVAL ?? "20", 10),
   finnhubApiKey: process.env.FINNHUB_API_KEY ?? "",
+  // Output folder for `npm run export:replay`; relative paths resolve against the server working directory
+  replayExportDir: process.env.REPLAY_EXPORT_DIR ?? "exports/replay",
   llm: {
     provider: process.env.LLM_PROVIDER ?? "gemini",
     gemini: {

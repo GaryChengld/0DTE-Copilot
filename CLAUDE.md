@@ -54,6 +54,7 @@ server/    # Express backend — market data, AI session, Socket.io
 # From server/
 npm run dev              # start backend with tsx hot-reload
 npm run build            # compile TypeScript to dist/
+npm run export:replay    # export cached ReplayData, one YYYY-MM-DD.json per day; `-- [folder] [--overwrite]` (existing files skipped unless --overwrite)
 npx prisma migrate dev   # apply schema changes and generate client
 npx prisma generate      # regenerate client without migrating
 npx prisma studio        # inspect SQLite database
@@ -93,6 +94,7 @@ npm run build            # build frontend for production
 | [22-sector-etf-api](.claude/tasks/22-sector-etf-api.md) | GET /api/etf/sectors — live price + % change for 11 S&P 500 sector ETFs | 2026-04-09 |
 | [23-journal-api](.claude/tasks/23-journal-api.md) | Journal table + CRUD APIs + AI advices by date + SPX historical candles by date | 2026-04-17 |
 | [24-trade-history-apis](.claude/tasks/24-trade-history-apis.md) | Monthly PNL aggregation + trades-by-date query APIs | 2026-04-18 |
+| [25-export-replay-data](.claude/tasks/25-export-replay-data.md) | `npm run export:replay` + `POST /api/replay/export` + Review-mode **Export All** button — write each cached ReplayData day to its own JSON file | 2026-09-13 |
 
 ### Client
 
@@ -156,6 +158,7 @@ npm run build            # build frontend for production
 | GET | `/api/ai-advices?date=YYYY-MM-DD` | Retrieve all user-sourced AI advices for a date |
 | GET | `/api/trades/pnl?year=Y&month=M` | Daily P&L totals for a given month (one entry per day with exits) |
 | GET | `/api/trades?date=YYYY-MM-DD` | All trades opened or exited on a given date, with full exits |
+| POST | `/api/replay/export` | Export all cached replay days to `REPLAY_EXPORT_DIR` (one `YYYY-MM-DD.json` each); never overwrites — existing files skipped; returns written/skipped dates |
 | GET | `/api/ai/replay/message?date=YYYY-MM-DD` | Historical analysis payload for a past date (no news/15m; all-day 5m candles with per-candle VWAP; daily_stats from Yahoo Finance historical data; market_summary for that date) |
 
 ## Health Check
@@ -174,7 +177,7 @@ The UI has two modes toggled by **Trading / Review** buttons in the status bar. 
 | Mode | Left panel | Middle panel | Right sidebar |
 |---|---|---|---|
 | **Trading** | `MarketDataPanel` — live SPX chart, snapshot, heatmap | AI Conversation + Preview Prompt tabs + ChatInputBar | News / Positions |
-| **Review** | `HistoryPanel` left — monthly P&L total, calendar (P&L-colored), SPX chart, daily trade details | `HistoryPanel` right — AI Advice log + Journal editor + Replay prompt | News / Positions |
+| **Review** | `HistoryPanel` left — monthly P&L total, calendar (P&L-colored), SPX chart, daily trade details | `HistoryPanel` right — AI Advice log + Journal editor + Replay prompt (with **Export All** button) + Backtest | News / Positions |
 
 ### Core Trading Logic (hierarchical, order matters)
 
@@ -205,7 +208,8 @@ The UI has two modes toggled by **Trading / Review** buttons in the status bar. 
 | `db/journalRepository.ts` | Upsert, delete, get by date, list dates by month for `Journal` table |
 | `routes/trades.ts` | Trade CRUD + exits + `GET /api/trades?date=` + `GET /api/trades/pnl?year=&month=`; `entryTime`/`exitTime` default to ET local time string |
 | `db/tradeRepository.ts` | Trade + TradeExit queries; `getMonthlyPnl` aggregates daily P&L from exits; `findTradesByDate` matches trades opened or exited on a date |
-| `routes/replay.ts` | `GET /api/ai/replay/message?date=` — historical analysis payload for Review mode Replay tab |
+| `routes/replay.ts` | `GET /api/ai/replay/message?date=` — historical analysis payload for Review mode Replay tab; `POST /api/replay/export` — export cached days to disk |
+| `services/replayExport.ts` | `exportReplayData(dir, overwrite)` — shared by `POST /api/replay/export` and `npm run export:replay` |
 | `tools/tv_feed.py` | Python polling script — fetches VIX/$ADD/$TICK from TradingView and POSTs to `/api/other_indexes` |
 | `tools/tv_export.py` | Python export script — downloads historical OHLCV candles from TradingView and computes RSI/SMA/EMA/ATR/MACD indicators into a CSV |
 
@@ -313,6 +317,7 @@ Create `server/.env` (gitignored). See `server/.env.example`:
 - `PORT` — server port (default `3001`)
 - `PROMPT_FILE` — which prompt file to load (default: `strategicPrompt.md`)
 - `SESSION_SUMMARY_INTERVAL` — messages before auto-restart (default: `20`)
+- `REPLAY_EXPORT_DIR` — output folder for replay exports (`npm run export:replay`, `POST /api/replay/export`, Review-mode **Export All** button). Read in `config.ts` as `config.replayExportDir`; default `exports/replay` → `server/exports/replay` (gitignored). Absolute or relative path (relative resolves against the server's working directory, normally `server/`); may be outside the repo; created on first export. Restart the backend after changing it. A CLI folder argument overrides it
 
 ## Prisma Notes
 
